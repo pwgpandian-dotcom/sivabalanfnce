@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+:root {
+  --color-ivory: #faf6ec;
+  --color-ivory-deep: #f1ead9;
+  --color-parchment: #eee3c8;
+  --color-wine: #5e1224;
+  --color-wine-deep: #3d0b18;
+  --color-wine-soft: #7a1c33;
+  --color-gold: #b6862c;
+  --color-gold-bright: #cf9f3f;
+  --color-gold-soft: #e2c789;
+  --color-ink: #2a1810;
+  --color-ink-soft: #6b5a4d;
+  /* Always-light text for use on wine/gold fills — never changes with theme. */
+  --color-onwine: #faf6ec;
+
+  --background: var(--color-ivory);
+  --foreground: var(--color-ink);
+}
+
+/*
+ * Dark mode. Strategy: flip only the pure SURFACE tokens (ivory family) and the
+ * page background; keep wine/gold/onwine fixed since they're used as fills with
+ * their own contrasting text. The TEXT usages of ink/wine are re-colored
+ * surgically below so headings and body copy stay readable on the dark surface.
+ */
+.dark {
+  --color-ivory: #23121a;       /* card / input surface */
+  --color-ivory-deep: #301823;  /* table headers, hover, deeper surface */
+  --color-parchment: #2c1620;
+  --background: #170b10;         /* near-black wine */
+  --foreground: #efe6d6;
+}
+
+.dark .text-ink {
+  color: #ece3d2;
+}
+.dark .text-ink-soft {
+  color: #b6a591;
+}
+.dark .text-wine,
+.dark .text-wine-soft {
+  color: #e8a7b4;              /* light rose so wine headings/values read on dark */
+}
+
+.dark .ledger-card {
+  background: linear-gradient(180deg, #2a1420 0%, var(--color-ivory) 100%);
+  border-color: rgba(182, 134, 44, 0.25);
+  box-shadow:
+    0 1px 0 rgba(182, 134, 44, 0.18) inset,
+    0 12px 30px -18px rgba(0, 0, 0, 0.65);
+}
+
+@theme inline {
+  --color-ivory: var(--color-ivory);
+  --color-ivory-deep: var(--color-ivory-deep);
+  --color-parchment: var(--color-parchment);
+  --color-wine: var(--color-wine);
+  --color-wine-deep: var(--color-wine-deep);
+  --color-wine-soft: var(--color-wine-soft);
+  --color-gold: var(--color-gold);
+  --color-gold-bright: var(--color-gold-bright);
+  --color-gold-soft: var(--color-gold-soft);
+  --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
+  --color-onwine: var(--color-onwine);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-serif: var(--font-heading);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-ledger);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  background-image:
+    radial-gradient(circle at 100% 0%, var(--color-parchment) 0%, transparent 45%),
+    radial-gradient(circle at 0% 100%, var(--color-ivory-deep) 0%, transparent 40%);
+  background-attachment: fixed;
+}
+
+.ledger-card {
+  background: linear-gradient(180deg, #fffdf7 0%, var(--color-ivory) 100%);
+  border: 1px solid var(--color-gold-soft);
+  box-shadow:
+    0 1px 0 rgba(182, 134, 44, 0.35) inset,
+    0 12px 30px -18px rgba(61, 11, 24, 0.45);
+}
+
+.ledger-rule {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 27px,
+    var(--color-gold-soft) 27px,
+    var(--color-gold-soft) 28px
+  );
+}
+
+/* Print: clean the pledge-ticket receipt onto plain paper — no app chrome. */
+@media print {
+  body {
+    background: #fff !important;
+    background-image: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .receipt-sheet {
+    border: 2px solid #000 !important;
+    max-width: 100% !important;
+  }
+}
