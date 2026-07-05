@@ -2,6 +2,7 @@ import Image from "next/image";
 import { LoginForm } from "./LoginForm";
 import { WelcomeVerse } from "../WelcomeVerse";
 import { CompanyHeader } from "../CompanyHeader";
+import { Footer } from "../Footer";
 import { tamilSerif } from "../fonts";
 
 const BRAND_GOLD = "#C9A227";
@@ -77,6 +78,7 @@ export default async function LoginPage({
           <WelcomeVerse className="max-w-md" tone="dark" />
           <LoginForm errorMessage={error} />
         </div>
+        <Footer />
       </div>
     </div>
   );
