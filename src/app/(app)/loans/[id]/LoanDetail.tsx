@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise, rupeesToPaise, toDateInputValue } from "@/lib/money";
 import { currentInterestOwed, currentRate } from "@/lib/loans";
-import { RePledgeSection, type RePledge } from "./RePledgeSection";
+import { RePledgeSection, type RePledge, type RePledgeHistory } from "./RePledgeSection";
 import { EditLoanForm, type StaffLite, type LoanEdit } from "./EditLoanForm";
 
 type RateSegment = {
@@ -51,11 +51,13 @@ export function LoanDetail({
   staff,
   shopId,
   editHistory,
+  rePledgeHistory,
 }: {
   loan: LoanDetailData;
   staff: StaffLite[];
   shopId: string;
   editHistory: LoanEdit[];
+  rePledgeHistory: RePledgeHistory[];
 }) {
   const { t } = useLocale();
   const router = useRouter();
@@ -185,7 +187,22 @@ export function LoanDetail({
         onChanged={() => router.refresh()}
       />
 
-      <RePledgeSection loanId={loan.id} loanNumber={loan.loan_number} rePledges={loan.re_pledges} />
+      <RePledgeSection
+        loanId={loan.id}
+        loanNumber={loan.loan_number}
+        loanActive={isActive}
+        shopId={shopId}
+        loanInfo={{
+          customerName: loan.customers.name,
+          customerPhone: loan.customers.phone,
+          itemType: loan.item_type,
+          pledgeItem: loan.pledge_item_description,
+          weightGrams: loan.pledge_weight_grams,
+          principalPaise: loan.principal_paise,
+        }}
+        rePledges={loan.re_pledges}
+        histories={rePledgeHistory}
+      />
 
       {editHistory.length > 0 && (
         <div className="ledger-card rounded-2xl p-8">

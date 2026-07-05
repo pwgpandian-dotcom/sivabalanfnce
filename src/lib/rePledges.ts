@@ -10,8 +10,10 @@ export type RePledgeRow = {
   loanId: string;
   loanNumber: string;
   customerName: string;
+  customerPhone: string | null;
   broker: string;
   receiptNumber: string | null;
+  tagNumber: string | null;
   amountPaise: number | null;
   ratePercent: number | null;
   pledgeDate: string;
@@ -34,9 +36,9 @@ export async function loadRePledges(supabase: SupabaseClient, shopId: string): P
   const { data, error } = await supabase
     .from("re_pledges")
     .select(
-      `id, larger_broker_name, larger_broker_receipt_number, amount_received_paise,
+      `id, larger_broker_name, larger_broker_receipt_number, external_tag_number, amount_received_paise,
        interest_rate_percent, pledge_date, status, redeemed_date, notes, created_at,
-       loans!inner(id, loan_number, shop_id, customers(name))`
+       loans!inner(id, loan_number, shop_id, customers(name, phone))`
     )
     .eq("loans.shop_id", shopId)
     .order("created_at", { ascending: false });
@@ -44,14 +46,20 @@ export async function loadRePledges(supabase: SupabaseClient, shopId: string): P
   if (error) return [];
 
   return (data ?? []).map((r) => {
-    const loan = r.loans as unknown as { id: string; loan_number: string; customers: { name: string } | null };
+    const loan = r.loans as unknown as {
+      id: string;
+      loan_number: string;
+      customers: { name: string; phone: string | null } | null;
+    };
     return {
       id: r.id,
       loanId: loan.id,
       loanNumber: loan.loan_number,
       customerName: loan.customers?.name ?? "",
+      customerPhone: loan.customers?.phone ?? null,
       broker: r.larger_broker_name,
       receiptNumber: r.larger_broker_receipt_number,
+      tagNumber: r.external_tag_number,
       amountPaise: r.amount_received_paise,
       ratePercent: r.interest_rate_percent,
       pledgeDate: r.pledge_date,

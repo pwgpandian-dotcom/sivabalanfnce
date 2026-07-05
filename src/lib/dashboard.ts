@@ -112,6 +112,38 @@ export async function loadRecentTransactions(
   });
 }
 
+export type RePledgeStats = {
+  totalRePledged: number;
+  todayRePledged: number;
+  redeemedToday: number;
+  outstandingPaise: number;
+};
+
+/** Re-pledge dashboard figures for a shop (tolerant if the tables aren't there). */
+export async function loadRePledgeStats(supabase: SupabaseClient, shopId: string): Promise<RePledgeStats> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("re_pledges")
+    .select("amount_received_paise, pledge_date, status, redeemed_date, loans!inner(shop_id)")
+    .eq("loans.shop_id", shopId);
+
+  if (error || !data) return { totalRePledged: 0, todayRePledged: 0, redeemedToday: 0, outstandingPaise: 0 };
+
+  let totalRePledged = 0;
+  let todayRePledged = 0;
+  let redeemedToday = 0;
+  let outstandingPaise = 0;
+  for (const r of data) {
+    if (r.status === "active") {
+      totalRePledged += 1;
+      outstandingPaise += r.amount_received_paise ?? 0;
+    }
+    if (r.pledge_date === today) todayRePledged += 1;
+    if (r.redeemed_date === today) redeemedToday += 1;
+  }
+  return { totalRePledged, todayRePledged, redeemedToday, outstandingPaise };
+}
+
 /** "YYYY-MM" key for a Date's year+month. */
 function monthKey(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;

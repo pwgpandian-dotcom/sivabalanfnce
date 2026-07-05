@@ -27,12 +27,13 @@ export function DashboardTable({ loans, emptyLabel }: { loans: DashboardLoan[]; 
   }
 
   return (
-    <div className="ledger-card overflow-hidden rounded-2xl">
+    <div className="ledger-card overflow-x-auto rounded-2xl">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-gold-soft bg-ivory-deep text-left text-xs uppercase tracking-wide text-ink-soft">
             <th className="px-4 py-3 font-medium">{t("dashboard", "loanNumber")}</th>
             <th className="px-4 py-3 font-medium">{t("dashboard", "customer")}</th>
+            <th className="px-4 py-3 font-medium">{t("rePledgeScreen", "status")}</th>
             <th className="px-4 py-3 font-medium text-right">{t("dashboard", "principal")}</th>
             <th className="px-4 py-3 font-medium text-right">{t("dashboard", "daysElapsed")}</th>
             <th className="px-4 py-3 font-medium text-right">{t("dashboard", "interestOwed")}</th>
@@ -41,6 +42,7 @@ export function DashboardTable({ loans, emptyLabel }: { loans: DashboardLoan[]; 
         <tbody>
           {loans.map((loan) => {
             const overdue = loan.daysElapsed >= OVERDUE_THRESHOLD_DAYS;
+            const rePledged = Boolean(loan.rePledgeBroker);
             return (
               <tr key={loan.id} className={`border-b border-gold-soft/60 last:border-0 ${overdue ? "bg-wine/5" : ""}`}>
                 <td className="px-4 py-3 font-mono text-ink">
@@ -48,16 +50,16 @@ export function DashboardTable({ loans, emptyLabel }: { loans: DashboardLoan[]; 
                     {loan.loanNumber}
                   </Link>
                 </td>
-                <td className="px-4 py-3">
-                  {loan.customerName}
-                  {loan.rePledgeBroker && (
-                    <span
-                      className="ml-2 inline-block rounded-full border border-wine bg-wine/10 px-2 py-0.5 text-[10px] font-medium text-wine"
-                      title={`${t("rePledge", "withBroker")} ${loan.rePledgeBroker}`}
-                    >
-                      {t("rePledge", "withBroker")} {loan.rePledgeBroker}
-                    </span>
-                  )}
+                <td className="px-4 py-3">{loan.customerName}</td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  <span
+                    className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                      rePledged ? "bg-wine-soft/15 text-wine-soft" : "bg-green-700/10 text-green-800"
+                    }`}
+                  >
+                    {t("pledgeStatus", rePledged ? "rePledged" : "inShop")}
+                  </span>
+                  {rePledged && <div className="mt-0.5 text-[10px] text-ink-soft">{loan.rePledgeBroker}</div>}
                 </td>
                 <td className="px-4 py-3 text-right font-mono">{formatPaise(loan.principalPaise)}</td>
                 <td className="px-4 py-3 text-right font-mono">

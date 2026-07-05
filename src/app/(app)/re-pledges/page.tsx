@@ -20,7 +20,7 @@ export default async function RePledgesPage() {
         <NavHeading navKey="rePledges" />
         <RePledgesSubtitle />
       </div>
-      <RePledgesScreen rePledges={rePledges} candidates={candidates} />
+      <RePledgesScreen rePledges={rePledges} candidates={candidates} shopName={session.shopName} />
     </div>
   );
 }

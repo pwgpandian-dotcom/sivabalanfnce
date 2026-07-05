@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireStaffSession } from "@/lib/auth/session";
 import { LoanDetail, type LoanDetailData } from "./LoanDetail";
 import type { StaffLite, LoanEdit } from "./EditLoanForm";
+import type { RePledgeHistory } from "./RePledgeSection";
 
 export default async function LoanDetailPage({
   params,
@@ -31,14 +32,19 @@ export default async function LoanDetailPage({
 
   // Fetched separately + tolerantly so the page still loads if a later migration
   // (re_pledges / loan_edit_history) hasn't been applied yet.
-  const [{ data: rePledges }, { data: history }, { data: staffData }] = await Promise.all([
+  const [{ data: rePledges }, { data: rpHistory }, { data: history }, { data: staffData }] = await Promise.all([
     supabase
       .from("re_pledges")
       .select(
-        "id, larger_broker_name, larger_broker_receipt_number, amount_received_paise, interest_rate_percent, pledge_date, status, redeemed_date, notes, created_at"
+        "id, pawn_broker_id, larger_broker_name, larger_broker_receipt_number, external_tag_number, amount_received_paise, pledge_date, status, redeemed_date, notes, created_at"
       )
       .eq("loan_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("re_pledge_history")
+      .select("id, re_pledge_id, action, changed_at, previous, re_pledges!inner(loan_id)")
+      .eq("re_pledges.loan_id", id)
+      .order("changed_at", { ascending: false }),
     supabase
       .from("loan_edit_history")
       .select("id, edited_at, previous")
@@ -60,6 +66,15 @@ export default async function LoanDetailPage({
     : [];
 
   const editHistory = (history ?? []) as unknown as LoanEdit[];
+  const rePledgeHistory = (rpHistory ?? []) as unknown as RePledgeHistory[];
 
-  return <LoanDetail loan={loan} staff={staff} shopId={session.shopId} editHistory={editHistory} />;
+  return (
+    <LoanDetail
+      loan={loan}
+      staff={staff}
+      shopId={session.shopId}
+      editHistory={editHistory}
+      rePledgeHistory={rePledgeHistory}
+    />
+  );
 }

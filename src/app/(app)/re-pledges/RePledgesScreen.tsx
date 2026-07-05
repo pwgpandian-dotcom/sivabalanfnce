@@ -7,13 +7,16 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise } from "@/lib/money";
 import type { RePledgeRow, CandidateRow } from "@/lib/rePledges";
+import { exportRePledgesPdf, exportRePledgesExcel } from "./rePledgeExport";
 
 export function RePledgesScreen({
   rePledges,
   candidates,
+  shopName,
 }: {
   rePledges: RePledgeRow[];
   candidates: CandidateRow[];
+  shopName: string;
 }) {
   const { t } = useLocale();
   const router = useRouter();
@@ -22,6 +25,35 @@ export function RePledgesScreen({
   const [tab, setTab] = useState<"all" | "candidates">("all");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "redeemed">("all");
+  const [busy, setBusy] = useState<null | "pdf" | "excel">(null);
+
+  async function handleExport(kind: "pdf" | "excel") {
+    setBusy(kind);
+    try {
+      const payload = {
+        shopName: shopName || "Sivabalan Finance",
+        title: t("rePledgeScreen", "reportTitle"),
+        columns: {
+          loan: t("rePledgeScreen", "loan"),
+          customer: t("rePledgeScreen", "customer"),
+          broker: t("rePledgeScreen", "broker"),
+          receipt: t("rePledge", "receiptNumber"),
+          tag: t("rePledgeScreen", "tag"),
+          amount: t("rePledgeScreen", "amount"),
+          status: t("rePledgeScreen", "status"),
+          date: t("rePledgeScreen", "date"),
+          redeemed: t("rePledgeScreen", "redeemedDate"),
+        },
+        statusLabels: { active: t("rePledgeScreen", "filterActive"), redeemed: t("rePledgeScreen", "filterRedeemed") },
+        rows: filtered,
+        filenameBase: "sivabalan-repledges",
+      };
+      if (kind === "pdf") await exportRePledgesPdf(payload);
+      else await exportRePledgesExcel(payload);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -31,7 +63,10 @@ export function RePledgesScreen({
       return (
         r.broker.toLowerCase().includes(q) ||
         r.loanNumber.toLowerCase().includes(q) ||
-        r.customerName.toLowerCase().includes(q)
+        r.customerName.toLowerCase().includes(q) ||
+        (r.customerPhone ?? "").toLowerCase().includes(q) ||
+        (r.receiptNumber ?? "").toLowerCase().includes(q) ||
+        (r.tagNumber ?? "").toLowerCase().includes(q)
       );
     });
   }, [rePledges, search, status]);
@@ -71,6 +106,22 @@ export function RePledgesScreen({
                   {t("rePledgeScreen", s === "all" ? "filterAll" : s === "active" ? "filterActive" : "filterRedeemed")}
                 </button>
               ))}
+            </div>
+            <div className="ml-auto flex gap-2">
+              <button
+                onClick={() => handleExport("pdf")}
+                disabled={busy !== null || filtered.length === 0}
+                className="rounded-lg bg-wine px-3 py-1.5 text-xs font-medium text-onwine hover:bg-wine-deep disabled:opacity-50"
+              >
+                {busy === "pdf" ? t("reports", "generating") : t("rePledgeScreen", "exportPdf")}
+              </button>
+              <button
+                onClick={() => handleExport("excel")}
+                disabled={busy !== null || filtered.length === 0}
+                className="rounded-lg border border-wine px-3 py-1.5 text-xs font-medium text-wine hover:bg-ivory-deep disabled:opacity-50"
+              >
+                {busy === "excel" ? t("reports", "generating") : t("rePledgeScreen", "exportExcel")}
+              </button>
             </div>
           </div>
 
