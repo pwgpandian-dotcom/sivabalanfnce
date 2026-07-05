@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { rupeesToPaise } from "@/lib/money";
 import { CustomerPicker, type PickerValue } from "./CustomerPicker";
+import { StaffSelect } from "../../StaffSelect";
 
 export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: number }) {
   const { t } = useLocale();
@@ -16,10 +17,14 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
   const [pawnId, setPawnId] = useState("");
   const [pledgeItem, setPledgeItem] = useState("");
   const [pledgeWeight, setPledgeWeight] = useState("");
+  const [itemType, setItemType] = useState<"gold" | "silver">("gold");
   const [principal, setPrincipal] = useState("");
   const [assessedValue, setAssessedValue] = useState("");
   const [rate, setRate] = useState("");
   const [loanDate, setLoanDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [remarks, setRemarks] = useState("");
+  const [issuedBy, setIssuedBy] = useState("");
+  const [receivedBy, setReceivedBy] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +72,10 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
         p_loan_number: String(pawn),
         p_assessed_value_paise: assessedValue ? rupeesToPaise(parseFloat(assessedValue)) : null,
         p_is_migrated: true,
+        p_item_type: itemType,
+        p_remarks: remarks.trim() || null,
+        p_issued_by: issuedBy || null,
+        p_received_by: receivedBy || null,
       });
 
       if (rpcError) {
@@ -123,10 +132,23 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
         </label>
       </div>
 
-      <label className="flex flex-col gap-1 text-sm text-ink-soft">
-        {t("newLoan", "pledgeItem")}
-        <input value={pledgeItem} onChange={(e) => setPledgeItem(e.target.value)} required className={inputClass.replace("font-mono ", "")} />
-      </label>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "pledgeItem")}
+          <input value={pledgeItem} onChange={(e) => setPledgeItem(e.target.value)} required className={inputClass.replace("font-mono ", "")} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "itemType")}
+          <select
+            value={itemType}
+            onChange={(e) => setItemType(e.target.value as "gold" | "silver")}
+            className={inputClass.replace("font-mono ", "")}
+          >
+            <option value="gold">{t("newLoan", "gold")}</option>
+            <option value="silver">{t("newLoan", "silver")}</option>
+          </select>
+        </label>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
@@ -146,6 +168,27 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
           <input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} required className={inputClass} />
         </label>
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "issuedBy")}
+          <StaffSelect shopId={shopId} value={issuedBy} onChange={setIssuedBy} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "receivedBy")}
+          <StaffSelect shopId={shopId} value={receivedBy} onChange={setReceivedBy} />
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-1 text-sm text-ink-soft">
+        {t("newLoan", "remarks")}
+        <textarea
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value)}
+          rows={2}
+          className={inputClass.replace("font-mono ", "")}
+        />
+      </label>
 
       {/* Receipt photo — flagged, needs a Storage bucket before wiring the upload. */}
       <div className="flex flex-col gap-1">

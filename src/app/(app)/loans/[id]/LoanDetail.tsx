@@ -8,6 +8,7 @@ import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise, rupeesToPaise, toDateInputValue } from "@/lib/money";
 import { currentInterestOwed, currentRate } from "@/lib/loans";
 import { RePledgeSection, type RePledge } from "./RePledgeSection";
+import { EditLoanForm, type StaffLite, type LoanEdit } from "./EditLoanForm";
 
 type RateSegment = {
   id: string;
@@ -35,17 +36,32 @@ export type LoanDetailData = {
   loan_date: string;
   status: "active" | "closed";
   closed_date: string | null;
-  customers: { name: string; phone: string | null; address: string | null };
+  item_type: "gold" | "silver" | null;
+  remarks: string | null;
+  issued_by: string | null;
+  received_by: string | null;
+  customers: { id: string; name: string; phone: string | null; address: string | null };
   interest_rate_segments: RateSegment[];
   payments: Payment[];
   re_pledges: RePledge[];
 };
 
-export function LoanDetail({ loan }: { loan: LoanDetailData }) {
+export function LoanDetail({
+  loan,
+  staff,
+  shopId,
+  editHistory,
+}: {
+  loan: LoanDetailData;
+  staff: StaffLite[];
+  shopId: string;
+  editHistory: LoanEdit[];
+}) {
   const { t } = useLocale();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const isActive = loan.status === "active";
+  const [editing, setEditing] = useState(false);
 
   const interestOwed = useMemo(
     () => currentInterestOwed(loan.principal_paise, loan.interest_rate_segments),
@@ -53,6 +69,7 @@ export function LoanDetail({ loan }: { loan: LoanDetailData }) {
   );
   const rateNow = currentRate(loan.interest_rate_segments);
   const activeRePledge = loan.re_pledges.find((r) => r.status === "active") ?? null;
+  const staffName = (id: string | null) => (id ? (staff.find((s) => s.userId === id)?.name ?? "—") : "—");
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,7 +97,13 @@ export function LoanDetail({ loan }: { loan: LoanDetailData }) {
                 </span>
               </div>
             )}
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap justify-end gap-2">
+              <button
+                onClick={() => setEditing((v) => !v)}
+                className="inline-block rounded-lg border border-wine px-3 py-1 text-sm text-wine transition-colors hover:bg-wine hover:text-onwine"
+              >
+                {t("loanDetail", "editLoan")}
+              </button>
               <Link
                 href={`/receipt/${loan.id}`}
                 className="inline-block rounded-lg border border-wine px-3 py-1 text-sm text-wine transition-colors hover:bg-wine hover:text-onwine"
@@ -91,11 +114,42 @@ export function LoanDetail({ loan }: { loan: LoanDetailData }) {
           </div>
         </div>
 
+        {editing && (
+          <div className="pt-5">
+            <EditLoanForm
+              shopId={shopId}
+              onCancel={() => setEditing(false)}
+              loan={{
+                id: loan.id,
+                customerId: loan.customers.id,
+                customerName: loan.customers.name,
+                customerPhone: loan.customers.phone,
+                customerAddress: loan.customers.address,
+                principalPaise: loan.principal_paise,
+                pledgeItem: loan.pledge_item_description,
+                pledgeWeightGrams: loan.pledge_weight_grams,
+                itemType: loan.item_type ?? "gold",
+                loanDate: loan.loan_date,
+                remarks: loan.remarks,
+                ratePercent: rateNow,
+                issuedBy: loan.issued_by,
+                receivedBy: loan.received_by,
+              }}
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-6 border-b border-gold-soft py-5 sm:grid-cols-4">
           <Field label={t("loanDetail", "loanDate")} value={loan.loan_date} mono />
           <Field label={t("newLoan", "principal")} value={formatPaise(loan.principal_paise)} mono />
           <Field label={t("loanDetail", "currentRate")} value={rateNow !== null ? `${rateNow}%` : "—"} mono />
           <Field label={t("dashboard", "interestOwed")} value={formatPaise(interestOwed)} mono highlight />
+        </div>
+
+        <div className="grid grid-cols-2 gap-6 border-b border-gold-soft py-5 sm:grid-cols-4">
+          <Field label={t("loanDetail", "itemTypeLabel")} value={t("newLoan", loan.item_type ?? "gold")} />
+          <Field label={t("loanDetail", "issuedByLabel")} value={staffName(loan.issued_by)} />
+          <Field label={t("loanDetail", "receivedByLabel")} value={staffName(loan.received_by)} />
         </div>
 
         <div className="py-5">
@@ -108,6 +162,11 @@ export function LoanDetail({ loan }: { loan: LoanDetailData }) {
               <span className="font-mono text-ink-soft"> — {loan.pledge_weight_grams}{t("loanDetail", "weightGrams")}</span>
             )}
           </p>
+          {loan.remarks && (
+            <p className="mt-2 text-sm text-ink-soft">
+              <span className="font-medium">{t("loanDetail", "remarksLabel")}:</span> {loan.remarks}
+            </p>
+          )}
         </div>
       </div>
 
@@ -127,6 +186,28 @@ export function LoanDetail({ loan }: { loan: LoanDetailData }) {
       />
 
       <RePledgeSection loanId={loan.id} loanNumber={loan.loan_number} rePledges={loan.re_pledges} />
+
+      {editHistory.length > 0 && (
+        <div className="ledger-card rounded-2xl p-8">
+          <h2 className="mb-3 font-serif text-lg font-semibold text-wine">{t("loanDetail", "editHistory")}</h2>
+          <ul className="flex flex-col gap-2 text-sm">
+            {editHistory.map((h) => {
+              const p = h.previous;
+              const prevPrincipal = typeof p.principal_paise === "number" ? formatPaise(p.principal_paise) : "—";
+              return (
+                <li key={h.id} className="border-b border-gold-soft/50 pb-2 last:border-0">
+                  <div className="text-ink-soft">
+                    {t("loanDetail", "editedOn")} {new Date(h.edited_at).toLocaleString()}
+                  </div>
+                  <div className="font-mono text-xs text-ink-soft">
+                    {`${prevPrincipal} · ${p.rate_percent ?? "—"}% · ${p.item_type ?? "—"} · ${p.loan_date ?? "—"}`}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {isActive && (
         <CloseLoanPanel

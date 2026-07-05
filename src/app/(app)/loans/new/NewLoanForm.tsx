@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { rupeesToPaise } from "@/lib/money";
+import { StaffSelect } from "../../StaffSelect";
 
 type Customer = { id: string; name: string; phone: string | null };
 
@@ -30,10 +31,14 @@ export function NewLoanForm({
 
   const [pledgeItem, setPledgeItem] = useState("");
   const [pledgeWeight, setPledgeWeight] = useState("");
+  const [itemType, setItemType] = useState<"gold" | "silver">("gold");
   const [principal, setPrincipal] = useState("");
   const [assessedValue, setAssessedValue] = useState("");
   const [rate, setRate] = useState("");
   const [loanDate, setLoanDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [remarks, setRemarks] = useState("");
+  const [issuedBy, setIssuedBy] = useState("");
+  const [receivedBy, setReceivedBy] = useState("");
 
   // Loan number: by default auto (SF-<sequence>, server-assigned). Staff can
   // toggle manual entry to back-fill an old paper record's original number.
@@ -103,6 +108,10 @@ export function NewLoanForm({
         p_initial_rate_percent: parseFloat(rate),
         p_loan_number: loanNumberArg,
         p_assessed_value_paise: assessedValue ? rupeesToPaise(parseFloat(assessedValue)) : null,
+        p_item_type: itemType,
+        p_remarks: remarks.trim() || null,
+        p_issued_by: issuedBy || null,
+        p_received_by: receivedBy || null,
       });
 
       if (rpcError) {
@@ -227,15 +236,28 @@ export function NewLoanForm({
         )}
       </div>
 
-      <label className="flex flex-col gap-1 text-sm text-ink-soft">
-        {t("newLoan", "pledgeItem")}
-        <input
-          value={pledgeItem}
-          onChange={(e) => setPledgeItem(e.target.value)}
-          required
-          className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 text-ink outline-none focus:border-wine"
-        />
-      </label>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="col-span-2 flex flex-col gap-1 text-sm text-ink-soft sm:col-span-1">
+          {t("newLoan", "pledgeItem")}
+          <input
+            value={pledgeItem}
+            onChange={(e) => setPledgeItem(e.target.value)}
+            required
+            className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 text-ink outline-none focus:border-wine"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "itemType")}
+          <select
+            value={itemType}
+            onChange={(e) => setItemType(e.target.value as "gold" | "silver")}
+            className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 text-ink outline-none focus:border-wine"
+          >
+            <option value="gold">{t("newLoan", "gold")}</option>
+            <option value="silver">{t("newLoan", "silver")}</option>
+          </select>
+        </label>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
@@ -291,6 +313,27 @@ export function NewLoanForm({
           />
         </label>
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "issuedBy")}
+          <StaffSelect shopId={shopId} value={issuedBy} onChange={setIssuedBy} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "receivedBy")}
+          <StaffSelect shopId={shopId} value={receivedBy} onChange={setReceivedBy} />
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-1 text-sm text-ink-soft">
+        {t("newLoan", "remarks")}
+        <textarea
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value)}
+          rows={2}
+          className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 text-ink outline-none focus:border-wine"
+        />
+      </label>
 
       {error && <p className="text-sm text-wine-soft">{error}</p>}
 
