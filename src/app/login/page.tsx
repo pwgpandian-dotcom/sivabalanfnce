@@ -1,7 +1,6 @@
 import Image from "next/image";
 import { LoginForm } from "./LoginForm";
 import { WelcomeVerse } from "../WelcomeVerse";
-import { CompanyHeader } from "../CompanyHeader";
 import { Footer } from "../Footer";
 import { tamilSerif } from "../fonts";
 
@@ -71,9 +70,8 @@ export default async function LoginPage({
         <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-r from-transparent to-background" />
       </div>
 
-      {/* Right: company name at top, then devotional verse + (unchanged) login form */}
+      {/* Right: devotional verse + (unchanged) login form; company name is in the footer */}
       <div className="flex w-full flex-1 flex-col px-4 py-8">
-        <CompanyHeader className="pt-2" />
         <div className="flex flex-1 flex-col items-center justify-center gap-6">
           <WelcomeVerse className="max-w-md" tone="dark" />
           <LoginForm errorMessage={error} />

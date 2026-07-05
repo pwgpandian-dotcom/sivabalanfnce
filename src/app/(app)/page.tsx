@@ -5,7 +5,6 @@ import { DashboardTable } from "./DashboardTable";
 import { DashboardHeading, DashboardAddLoanLabel } from "./DashboardHeading";
 import { WelcomeBanner } from "./WelcomeBanner";
 import { WelcomeVerse } from "../WelcomeVerse";
-import { CompanyHeader } from "../CompanyHeader";
 import { SummaryCards } from "./SummaryCards";
 import { ClosuresChart } from "./ClosuresChart";
 import { QuickActions } from "./QuickActions";
@@ -26,7 +25,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CompanyHeader />
       <WelcomeBanner shopName={session.shopName} role={session.role} />
       <WelcomeVerse />
       <SummaryCards stats={stats} />
