@@ -29,6 +29,8 @@ create index if not exists idx_loan_edit_history_loan on loan_edit_history(loan_
 
 alter table loan_edit_history enable row level security;
 
+-- Idempotent: drop first so re-running this migration doesn't error with 42710.
+drop policy if exists "staff can access loan edit history via loan shop" on loan_edit_history;
 create policy "staff can access loan edit history via loan shop" on loan_edit_history
   for all using (
     exists (select 1 from loans l where l.id = loan_id and has_shop_access(l.shop_id))

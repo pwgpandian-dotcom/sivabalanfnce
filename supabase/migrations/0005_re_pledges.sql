@@ -24,6 +24,7 @@ create index if not exists idx_re_pledges_loan on re_pledges(loan_id, status);
 -- Same shop-scoped access pattern as payments/segments (access via the loan's shop).
 alter table re_pledges enable row level security;
 
+drop policy if exists "staff can access re_pledges via loan shop" on re_pledges;
 create policy "staff can access re_pledges via loan shop" on re_pledges
   for all using (
     exists (select 1 from loans l where l.id = loan_id and has_shop_access(l.shop_id))

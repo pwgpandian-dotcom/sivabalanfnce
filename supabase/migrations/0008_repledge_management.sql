@@ -21,6 +21,7 @@ create index if not exists idx_pawn_brokers_shop on pawn_brokers(shop_id, name);
 
 alter table pawn_brokers enable row level security;
 
+drop policy if exists "staff can access pawn_brokers in their shop" on pawn_brokers;
 create policy "staff can access pawn_brokers in their shop" on pawn_brokers
   for all using (has_shop_access(shop_id)) with check (has_shop_access(shop_id));
 
@@ -55,6 +56,7 @@ create index if not exists idx_re_pledge_history on re_pledge_history(re_pledge_
 
 alter table re_pledge_history enable row level security;
 
+drop policy if exists "staff can access re_pledge_history via loan shop" on re_pledge_history;
 create policy "staff can access re_pledge_history via loan shop" on re_pledge_history
   for all using (
     exists (
