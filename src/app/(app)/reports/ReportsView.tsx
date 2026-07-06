@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
-import { formatPaise } from "@/lib/money";
+import { formatPaise, formatPaiseAscii } from "@/lib/money";
 import type { ReportData, ReportLoan } from "@/lib/reports";
 
 type Preset = "today" | "yesterday" | "week" | "month" | "lastMonth" | "6" | "12" | "custom";
@@ -84,13 +84,14 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
       const title = `${t("reports", "reportTitle")} · ${start} → ${end}`;
 
       // Single source of truth for the summary — used identically by PDF and Excel.
+      // Exports use the ASCII "Rs." form since jsPDF's fonts lack the ₹ glyph.
       const summaryRows: [string, string][] = [
         [t("reports", "loansCount"), String(summary.loansCount)],
-        [t("reports", "loanAmount"), formatPaise(summary.loanAmount)],
-        [t("reports", "interestCollected"), formatPaise(summary.interest)],
-        [t("reports", "totalInterest"), formatPaise(summary.totalInterest)],
-        [t("reports", "returned"), formatPaise(summary.returned)],
-        [t("reports", "outstanding"), formatPaise(data.outstandingPaise)],
+        [t("reports", "loanAmount"), formatPaiseAscii(summary.loanAmount)],
+        [t("reports", "interestCollected"), formatPaiseAscii(summary.interest)],
+        [t("reports", "totalInterest"), formatPaiseAscii(summary.totalInterest)],
+        [t("reports", "returned"), formatPaiseAscii(summary.returned)],
+        [t("reports", "outstanding"), formatPaiseAscii(data.outstandingPaise)],
         [t("reports", "activeCount"), String(summary.active)],
         [t("reports", "closedCount"), String(summary.closed)],
         [t("reports", "rePledged"), String(summary.rePledged)],
@@ -101,7 +102,7 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
         r.customerName,
         r.itemType ?? "—",
         r.loanDate,
-        formatPaise(r.principalPaise),
+        formatPaiseAscii(r.principalPaise),
         r.status,
       ]);
       const WINE: [number, number, number] = [94, 18, 36];
@@ -165,7 +166,7 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
         fillHeader(ws.addRow(detailHead));
         for (const r of rows) {
           const row = ws.addRow([r.loanNumber, r.customerName, r.itemType ?? "", r.loanDate, r.principalPaise / 100, r.status]);
-          row.getCell(5).numFmt = '"₹"#,##0.00';
+          row.getCell(5).numFmt = '"Rs. "#,##0.00';
         }
 
         // Column widths.

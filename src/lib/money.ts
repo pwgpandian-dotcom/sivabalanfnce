@@ -7,6 +7,19 @@ export function formatPaise(paise: number): string {
   })}`;
 }
 
+/**
+ * ASCII-safe rupee string for PDF/export text, e.g. 700000 -> "Rs. 7,000.00".
+ * jsPDF's built-in fonts (Helvetica etc.) have no ₹ glyph (U+20B9) and render it
+ * as a wrong character, so exports use "Rs." instead of the on-screen ₹ symbol.
+ */
+export function formatPaiseAscii(paise: number): string {
+  const rupees = paise / 100;
+  return `Rs. ${rupees.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 export function rupeesToPaise(rupees: number): number {
   return Math.round(rupees * 100);
 }

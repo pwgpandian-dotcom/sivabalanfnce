@@ -1,4 +1,4 @@
-import { formatPaise } from "@/lib/money";
+import { formatPaiseAscii } from "@/lib/money";
 
 export type ReportExportData = {
   shopName: string;
@@ -36,14 +36,14 @@ export async function exportReportPdf(data: ReportExportData): Promise<void> {
       r.label,
       String(r.opened),
       String(r.closed),
-      formatPaise(r.interestPaise),
+      formatPaiseAscii(r.interestPaise),
     ]),
     foot: [
       [
         data.columns.total,
         String(data.totals.opened),
         String(data.totals.closed),
-        formatPaise(data.totals.interestPaise),
+        formatPaiseAscii(data.totals.interestPaise),
       ],
     ],
     styles: { fontSize: 10, cellPadding: 3 },
@@ -94,7 +94,7 @@ export async function exportReportExcel(data: ReportExportData): Promise<void> {
       closed: r.closed,
       interest: r.interestPaise / 100,
     });
-    row.getCell("interest").numFmt = '"₹"#,##0.00';
+    row.getCell("interest").numFmt = '"Rs. "#,##0.00';
   });
 
   const totalRow = ws.addRow({
@@ -104,7 +104,7 @@ export async function exportReportExcel(data: ReportExportData): Promise<void> {
     interest: data.totals.interestPaise / 100,
   });
   totalRow.font = { bold: true };
-  totalRow.getCell("interest").numFmt = '"₹"#,##0.00';
+  totalRow.getCell("interest").numFmt = '"Rs. "#,##0.00';
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {

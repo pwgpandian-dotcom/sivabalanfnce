@@ -1,4 +1,4 @@
-import { formatPaise } from "@/lib/money";
+import { formatPaiseAscii } from "@/lib/money";
 import type { RePledgeRow } from "@/lib/rePledges";
 
 export type RePledgeExportData = {
@@ -59,7 +59,7 @@ export async function exportRePledgesPdf(data: RePledgeExportData): Promise<void
       r.broker,
       r.receiptNumber ?? "—",
       r.tagNumber ?? "—",
-      r.amountPaise != null ? formatPaise(r.amountPaise) : "—",
+      r.amountPaise != null ? formatPaiseAscii(r.amountPaise) : "—",
       statusLabel(data, r),
       r.pledgeDate,
       r.redeemedDate ?? "—",
@@ -108,7 +108,7 @@ export async function exportRePledgesExcel(data: RePledgeExportData): Promise<vo
       date: r.pledgeDate,
       redeemed: r.redeemedDate ?? "",
     });
-    row.getCell("amount").numFmt = '"₹"#,##0.00';
+    row.getCell("amount").numFmt = '"Rs. "#,##0.00';
   }
 
   const buffer = await wb.xlsx.writeBuffer();
