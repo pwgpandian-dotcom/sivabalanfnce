@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise, rupeesToPaise, toDateInputValue } from "@/lib/money";
-import { currentInterestOwed, currentRate } from "@/lib/loans";
+import { currentInterestOwed, currentRate, toRateSegments } from "@/lib/loans";
+import { calculateInterestPaise, monthsForPeriod, interestForMonths } from "@/lib/interest";
 import { RePledgeSection, type RePledge, type RePledgeHistory } from "./RePledgeSection";
 import { EditLoanForm, type StaffLite, type LoanEdit } from "./EditLoanForm";
 
@@ -229,8 +230,11 @@ export function LoanDetail({
       {isActive && (
         <CloseLoanPanel
           loanId={loan.id}
-          interestOwed={interestOwed}
           principalPaise={loan.principal_paise}
+          segments={loan.interest_rate_segments}
+          paidInterestPaise={loan.payments
+            .filter((p) => p.payment_type === "interest")
+            .reduce((s, p) => s + p.amount_paise, 0)}
           supabase={supabase}
           onClosed={() => router.refresh()}
         />
@@ -521,25 +525,54 @@ function PaymentsSection({
   );
 }
 
+const MS_DAY = 24 * 60 * 60 * 1000;
+const parseUTC = (s: string) => new Date(s + "T00:00:00Z");
+
 function CloseLoanPanel({
   loanId,
-  interestOwed,
   principalPaise,
+  segments,
+  paidInterestPaise,
   supabase,
   onClosed,
 }: {
   loanId: string;
-  interestOwed: number;
   principalPaise: number;
+  segments: RateSegment[];
+  paidInterestPaise: number;
   supabase: ReturnType<typeof createClient>;
   onClosed: () => void;
 }) {
   const { t } = useLocale();
   const [confirming, setConfirming] = useState(false);
   const [closedDate, setClosedDate] = useState(toDateInputValue(new Date()));
-  const [finalAmount, setFinalAmount] = useState(((principalPaise + interestOwed) / 100).toFixed(2));
+  const [monthsOverride, setMonthsOverride] = useState<string>(""); // "" = auto (round-up)
+  const [finalEdited, setFinalEdited] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const rateSegs = useMemo(() => toRateSegments(segments), [segments]);
+  const openSeg = segments.find((s) => s.effective_to === null) ?? segments[segments.length - 1];
+  const currentRate = openSeg?.rate_percent ?? 0;
+
+  // Everything below recomputes live from the chosen closed date + month override.
+  const asOf = parseUTC(closedDate);
+  const openStart = openSeg ? parseUTC(openSeg.effective_from) : asOf;
+  const autoMonths = monthsForPeriod(openStart, asOf);
+  const exactMonths = Math.max(0, Math.round((asOf.getTime() - openStart.getTime()) / MS_DAY)) / 30;
+
+  const months = monthsOverride !== "" && !Number.isNaN(parseFloat(monthsOverride)) ? parseFloat(monthsOverride) : autoMonths;
+
+  // Interest from any already-closed (past) rate segments stays fixed; only the
+  // current open segment's months are adjustable.
+  const autoInterestAtClose = calculateInterestPaise(principalPaise, rateSegs, asOf);
+  const openInterestAuto = interestForMonths(principalPaise, currentRate, autoMonths);
+  const pastInterest = Math.max(0, autoInterestAtClose - openInterestAuto);
+
+  const originalInterest = pastInterest + interestForMonths(principalPaise, currentRate, months);
+  const balanceInterest = Math.max(0, originalInterest - paidInterestPaise);
+  const settlementPaise = principalPaise + balanceInterest;
+  const finalAmount = finalEdited ?? (settlementPaise / 100).toFixed(2);
 
   async function handleConfirm() {
     setSubmitting(true);
@@ -548,7 +581,7 @@ function CloseLoanPanel({
       p_loan_id: loanId,
       p_closed_date: closedDate,
       p_final_payment_amount_paise: rupeesToPaise(parseFloat(finalAmount)),
-      p_manual_interest_override_paise: null,
+      p_manual_interest_override_paise: balanceInterest,
       p_manual_principal_override_paise: null,
     });
     setSubmitting(false);
@@ -558,6 +591,8 @@ function CloseLoanPanel({
     }
     onClosed();
   }
+
+  const preset = "rounded-full border border-gold-soft px-3 py-1 text-xs hover:bg-ivory-deep";
 
   return (
     <div className="ledger-card rounded-2xl border-2 border-wine p-6">
@@ -569,29 +604,73 @@ function CloseLoanPanel({
           {t("loanDetail", "closeLoan")}
         </button>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <p className="text-sm text-ink-soft">{t("loanDetail", "closeLoanConfirm")}</p>
-          <div className="flex flex-wrap gap-3">
-            <label className="flex flex-col gap-1 text-sm text-ink-soft">
-              {t("loanDetail", "finalAmount")}
-              <input
-                type="number"
-                step="0.01"
-                value={finalAmount}
-                onChange={(e) => setFinalAmount(e.target.value)}
-                className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 font-mono outline-none focus:border-wine"
-              />
-            </label>
+
+          <div className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1 text-sm text-ink-soft">
               {t("loanDetail", "closedDate")}
               <input
                 type="date"
                 value={closedDate}
-                onChange={(e) => setClosedDate(e.target.value)}
+                onChange={(e) => {
+                  setClosedDate(e.target.value);
+                  setMonthsOverride("");
+                  setFinalEdited(null);
+                }}
                 className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 font-mono outline-none focus:border-wine"
               />
             </label>
+            <label className="flex flex-col gap-1 text-sm text-ink-soft">
+              {t("loanDetail", "monthsUnit")}
+              <input
+                type="number"
+                step="0.5"
+                value={monthsOverride !== "" ? monthsOverride : String(autoMonths)}
+                onChange={(e) => {
+                  setMonthsOverride(e.target.value);
+                  setFinalEdited(null);
+                }}
+                className="w-24 rounded-lg border border-gold-soft bg-ivory px-3 py-2 font-mono outline-none focus:border-wine"
+              />
+            </label>
+            <span className="pb-2 font-mono text-xs text-ink-soft">
+              {t("loanDetail", "calcMonths")}: {autoMonths} {t("loanDetail", "monthsUnit")}
+            </span>
           </div>
+
+          {/* Manual override presets */}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setMonthsOverride(String(autoMonths)); setFinalEdited(null); }} className={preset}>
+              {t("loanDetail", "fullMonth")}
+            </button>
+            <button type="button" onClick={() => { setMonthsOverride(String(Math.max(0.5, autoMonths - 0.5))); setFinalEdited(null); }} className={preset}>
+              {t("loanDetail", "halfMonth")}
+            </button>
+            <button type="button" onClick={() => { setMonthsOverride(exactMonths.toFixed(2)); setFinalEdited(null); }} className={preset}>
+              {t("loanDetail", "exactDays")}
+            </button>
+          </div>
+
+          {/* Settlement breakdown */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-gold-soft bg-ivory-deep/40 p-3 text-sm sm:grid-cols-4">
+            <Field label={t("loanDetail", "originalInterest")} value={formatPaise(originalInterest)} mono />
+            <Field label={t("loanDetail", "paidInterest")} value={formatPaise(paidInterestPaise)} mono />
+            <Field label={t("loanDetail", "balanceInterest")} value={formatPaise(balanceInterest)} mono />
+            <Field label={t("loanDetail", "finalSettlement")} value={formatPaise(settlementPaise)} mono highlight />
+          </div>
+
+          <label className="flex max-w-xs flex-col gap-1 text-sm text-ink-soft">
+            {t("loanDetail", "finalAmount")}
+            <input
+              type="number"
+              step="0.01"
+              value={finalAmount}
+              onChange={(e) => setFinalEdited(e.target.value)}
+              className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 font-mono outline-none focus:border-wine"
+            />
+          </label>
+
           <div className="flex gap-3">
             <button
               onClick={handleConfirm}

@@ -18,33 +18,34 @@ function daysBetween(start: Date, end: Date): number {
   return Math.round((end.getTime() - start.getTime()) / MS_PER_DAY);
 }
 
-/** Interest for a single rate segment using the 30-day / half-month proration rule. */
-export function computePeriodInterestPaise(
-  principalPaise: number,
-  ratePercent: number,
-  startDate: Date,
-  endDate: Date
-): number {
+/**
+ * Whole months charged for a period, using the round-up rule: any partial month
+ * rounds up to the next full month, with a minimum of 1 month.
+ *   1–30 days → 1 month, 31–60 → 2, 61–90 → 3, "2 months 10 days" (70) → 3.
+ */
+export function monthsForPeriod(startDate: Date, endDate: Date): number {
   const totalDays = daysBetween(startDate, endDate);
   if (totalDays < 0) {
     throw new Error(
       `end_date (${endDate.toISOString()}) must not be before start_date (${startDate.toISOString()})`
     );
   }
+  return Math.max(1, Math.ceil(totalDays / 30));
+}
 
-  const fullMonths = Math.floor(totalDays / 30);
-  const extraDays = totalDays - fullMonths * 30;
+/** Interest for a given number of months (supports fractional manual overrides). */
+export function interestForMonths(principalPaise: number, ratePercent: number, months: number): number {
+  return Math.round(principalPaise * (ratePercent / 100) * months);
+}
 
-  let interestUnits: number;
-  if (extraDays === 0) {
-    interestUnits = fullMonths;
-  } else if (extraDays <= 10) {
-    interestUnits = fullMonths + 0.5;
-  } else {
-    interestUnits = fullMonths + 1;
-  }
-
-  return Math.round(principalPaise * (ratePercent / 100) * interestUnits);
+/** Interest for a single rate segment using the round-up (min 1 month) rule. */
+export function computePeriodInterestPaise(
+  principalPaise: number,
+  ratePercent: number,
+  startDate: Date,
+  endDate: Date
+): number {
+  return interestForMonths(principalPaise, ratePercent, monthsForPeriod(startDate, endDate));
 }
 
 /**

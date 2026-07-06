@@ -7,19 +7,27 @@ import { WelcomeBanner } from "./WelcomeBanner";
 import { WelcomeVerse } from "../WelcomeVerse";
 import { SummaryCards } from "./SummaryCards";
 import { RePledgeCards } from "./RePledgeCards";
+import { InterestCards } from "./InterestCards";
 import { ClosuresChart } from "./ClosuresChart";
 import { QuickActions } from "./QuickActions";
 import { RecentTransactions } from "./RecentTransactions";
-import { loadSummaryStats, loadMonthlyClosures, loadRecentTransactions, loadRePledgeStats } from "@/lib/dashboard";
+import {
+  loadSummaryStats,
+  loadMonthlyClosures,
+  loadRecentTransactions,
+  loadRePledgeStats,
+  loadInterestStats,
+} from "@/lib/dashboard";
 import { loadActiveDashboardLoans } from "@/lib/loanLists";
 
 export default async function DashboardPage() {
   const session = await requireStaffSession();
   const supabase = await createClient();
 
-  const [stats, rpStats, closures, recentTx, loans] = await Promise.all([
+  const [stats, rpStats, interestStats, closures, recentTx, loans] = await Promise.all([
     loadSummaryStats(supabase, session.shopId),
     loadRePledgeStats(supabase, session.shopId),
+    loadInterestStats(supabase, session.shopId),
     loadMonthlyClosures(supabase, session.shopId, 12),
     loadRecentTransactions(supabase, session.shopId, 6),
     loadActiveDashboardLoans(supabase, session.shopId),
@@ -30,6 +38,7 @@ export default async function DashboardPage() {
       <WelcomeBanner shopName={session.shopName} role={session.role} />
       <WelcomeVerse />
       <SummaryCards stats={stats} />
+      <InterestCards stats={interestStats} />
       <RePledgeCards stats={rpStats} />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

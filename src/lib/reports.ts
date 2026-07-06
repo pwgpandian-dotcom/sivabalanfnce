@@ -1,5 +1,68 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// Raw rows for the client-side date-range report (a single fetch; the client
+// slices by the selected range/preset without re-hitting the server).
+export type ReportLoan = {
+  id: string;
+  loanNumber: string;
+  customerName: string;
+  itemType: string | null;
+  loanDate: string;
+  closedDate: string | null;
+  principalPaise: number;
+  status: "active" | "closed";
+};
+export type ReportPayment = {
+  paymentDate: string;
+  amountPaise: number;
+  interestPaise: number;
+};
+export type ReportData = {
+  loans: ReportLoan[];
+  payments: ReportPayment[];
+  rePledgeDates: string[];
+  outstandingPaise: number;
+};
+
+export async function loadReportData(supabase: SupabaseClient, shopId: string): Promise<ReportData> {
+  const [loansRes, paymentsRes, rpRes] = await Promise.all([
+    supabase
+      .from("loans")
+      .select("id, loan_number, loan_date, closed_date, principal_paise, status, item_type, customers(name)")
+      .eq("shop_id", shopId)
+      .order("loan_date", { ascending: false }),
+    supabase
+      .from("payments")
+      .select("payment_date, amount_paise, payment_type, auto_calculated_interest_paise, manual_interest_override_paise, loans!inner(shop_id)")
+      .eq("loans.shop_id", shopId),
+    supabase.from("re_pledges").select("pledge_date, loans!inner(shop_id)").eq("loans.shop_id", shopId),
+  ]);
+
+  const loans: ReportLoan[] = (loansRes.data ?? []).map((l) => ({
+    id: l.id,
+    loanNumber: l.loan_number,
+    customerName: (l.customers as unknown as { name: string } | null)?.name ?? "",
+    itemType: l.item_type ?? null,
+    loanDate: l.loan_date,
+    closedDate: l.closed_date,
+    principalPaise: l.principal_paise,
+    status: l.status === "closed" ? "closed" : "active",
+  }));
+
+  const payments: ReportPayment[] = (paymentsRes.data ?? []).map((p) => {
+    let interest = 0;
+    if (p.payment_type === "interest") interest = p.amount_paise ?? 0;
+    else if (p.payment_type === "full_closing")
+      interest = p.manual_interest_override_paise ?? p.auto_calculated_interest_paise ?? 0;
+    return { paymentDate: p.payment_date, amountPaise: p.amount_paise ?? 0, interestPaise: interest };
+  });
+
+  const rePledgeDates = (rpRes.data ?? []).map((r) => r.pledge_date as string).filter(Boolean);
+  const outstandingPaise = loans.filter((l) => l.status === "active").reduce((s, l) => s + l.principalPaise, 0);
+
+  return { loans, payments, rePledgeDates, outstandingPaise };
+}
+
 export type MonthlyReportRow = {
   monthKey: string; // "YYYY-MM"
   opened: number;

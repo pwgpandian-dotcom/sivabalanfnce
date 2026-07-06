@@ -112,6 +112,70 @@ export async function loadRecentTransactions(
   });
 }
 
+export type InterestStats = {
+  dailyIssuedPaise: number;
+  dailyReturnedPaise: number;
+  outstandingPaise: number;
+  overallInterestPaise: number;
+  monthlyInterestPaise: number;
+  todayInterestPaise: number;
+};
+
+/** Interest-portion of a payment (interest payments in full; closings via the recorded interest). */
+function paymentInterestPaise(p: {
+  payment_type: string;
+  amount_paise: number;
+  auto_calculated_interest_paise: number | null;
+  manual_interest_override_paise: number | null;
+}): number {
+  if (p.payment_type === "interest") return p.amount_paise ?? 0;
+  if (p.payment_type === "full_closing")
+    return p.manual_interest_override_paise ?? p.auto_calculated_interest_paise ?? 0;
+  return 0;
+}
+
+/** Daily amounts + interest-income figures for the dashboard. */
+export async function loadInterestStats(supabase: SupabaseClient, shopId: string): Promise<InterestStats> {
+  const today = new Date().toISOString().slice(0, 10);
+  const month = today.slice(0, 7);
+
+  const [loansRes, paymentsRes] = await Promise.all([
+    supabase.from("loans").select("loan_date, principal_paise, status").eq("shop_id", shopId),
+    supabase
+      .from("payments")
+      .select("payment_date, amount_paise, payment_type, auto_calculated_interest_paise, manual_interest_override_paise, loans!inner(shop_id)")
+      .eq("loans.shop_id", shopId),
+  ]);
+
+  let dailyIssuedPaise = 0;
+  let outstandingPaise = 0;
+  for (const l of loansRes.data ?? []) {
+    if (l.loan_date === today) dailyIssuedPaise += l.principal_paise ?? 0;
+    if (l.status === "active") outstandingPaise += l.principal_paise ?? 0;
+  }
+
+  let dailyReturnedPaise = 0;
+  let overallInterestPaise = 0;
+  let monthlyInterestPaise = 0;
+  let todayInterestPaise = 0;
+  for (const p of paymentsRes.data ?? []) {
+    if (p.payment_date === today) dailyReturnedPaise += p.amount_paise ?? 0;
+    const interest = paymentInterestPaise(p);
+    overallInterestPaise += interest;
+    if ((p.payment_date ?? "").startsWith(month)) monthlyInterestPaise += interest;
+    if (p.payment_date === today) todayInterestPaise += interest;
+  }
+
+  return {
+    dailyIssuedPaise,
+    dailyReturnedPaise,
+    outstandingPaise,
+    overallInterestPaise,
+    monthlyInterestPaise,
+    todayInterestPaise,
+  };
+}
+
 export type RePledgeStats = {
   totalRePledged: number;
   todayRePledged: number;
