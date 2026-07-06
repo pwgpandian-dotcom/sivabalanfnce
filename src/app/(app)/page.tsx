@@ -4,7 +4,7 @@ import { requireStaffSession } from "@/lib/auth/session";
 import { DashboardTable } from "./DashboardTable";
 import { DashboardHeading, DashboardAddLoanLabel } from "./DashboardHeading";
 import { WelcomeBanner } from "./WelcomeBanner";
-import { WelcomeVerse } from "../WelcomeVerse";
+import { WelcomeVerseCard } from "./WelcomeVerseCard";
 import { SummaryCards } from "./SummaryCards";
 import { RePledgeCards } from "./RePledgeCards";
 import { InterestCards } from "./InterestCards";
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <WelcomeBanner shopName={session.shopName} role={session.role} />
-      <WelcomeVerse />
+      <WelcomeVerseCard />
       <SummaryCards stats={stats} />
       <InterestCards stats={interestStats} />
       <RePledgeCards stats={rpStats} />
