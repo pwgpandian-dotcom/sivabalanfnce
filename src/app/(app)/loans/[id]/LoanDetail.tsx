@@ -173,7 +173,7 @@ export function LoanDetail({
           <Field label={t("loanDetail", "loanDate")} value={loan.loan_date} mono />
           <Field label={t("newLoan", "principal")} value={formatPaise(loan.principal_paise)} mono />
           <Field label={t("loanDetail", "currentRate")} value={rateNow !== null ? `${rateNow}%` : "—"} mono />
-          <Field label={t("dashboard", "interestOwed")} value={formatPaise(interestOwed)} mono highlight />
+          <Field label={t("dashboard", "interestDue")} value={formatPaise(interestOwed)} mono highlight />
         </div>
 
         <div className="grid grid-cols-2 gap-6 border-b border-gold-soft py-5 sm:grid-cols-4">

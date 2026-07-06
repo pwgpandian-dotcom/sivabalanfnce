@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { currentInterestOwed } from "@/lib/loans";
 import { daysSince } from "@/lib/money";
 import type { DashboardLoan } from "@/app/(app)/DashboardTable";
 import type { ClosedLoan } from "@/app/(app)/ClosedLoansTable";
@@ -15,9 +14,7 @@ export async function loadActiveDashboardLoans(
 ): Promise<DashboardLoan[]> {
   const { data, error } = await supabase
     .from("loans")
-    .select(
-      "id, loan_number, principal_paise, loan_date, customers(name), interest_rate_segments(rate_percent, effective_from, effective_to)"
-    )
+    .select("id, loan_number, principal_paise, loan_date, customers(name)")
     .eq("shop_id", shopId)
     .eq("status", "active")
     .order("loan_date", { ascending: true });
@@ -31,6 +28,10 @@ export async function loadActiveDashboardLoans(
   const rePledgeByLoan = new Map<string, string>();
   // Map of loan_id -> most recent interest payment date, for the overdue flag.
   const lastInterestByLoan = new Map<string, string>();
+  // Map of loan_id -> total interest already collected from the customer. This
+  // includes any first-month interest deducted at issuance (recorded as an
+  // interest payment), matching the new-loan and closing modules.
+  const interestPaidByLoan = new Map<string, number>();
   const loanIds = loans.map((l) => l.id);
   if (loanIds.length > 0) {
     const [rpRes, payRes] = await Promise.all([
@@ -41,7 +42,7 @@ export async function loadActiveDashboardLoans(
         .eq("status", "active"),
       supabase
         .from("payments")
-        .select("loan_id, payment_date")
+        .select("loan_id, payment_date, amount_paise")
         .in("loan_id", loanIds)
         .eq("payment_type", "interest"),
     ]);
@@ -51,6 +52,7 @@ export async function loadActiveDashboardLoans(
     for (const p of payRes.data ?? []) {
       const prev = lastInterestByLoan.get(p.loan_id);
       if (!prev || p.payment_date > prev) lastInterestByLoan.set(p.loan_id, p.payment_date);
+      interestPaidByLoan.set(p.loan_id, (interestPaidByLoan.get(p.loan_id) ?? 0) + (p.amount_paise ?? 0));
     }
   }
 
@@ -65,7 +67,7 @@ export async function loadActiveDashboardLoans(
       principalPaise: loan.principal_paise,
       daysElapsed: daysSince(loan.loan_date),
       overdueDays: daysSince(lastInterest),
-      interestOwedPaise: currentInterestOwed(loan.principal_paise, loan.interest_rate_segments ?? []),
+      interestPaidPaise: interestPaidByLoan.get(loan.id) ?? 0,
       rePledgeBroker: rePledgeByLoan.get(loan.id) ?? null,
     };
   });

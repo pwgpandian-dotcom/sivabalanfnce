@@ -14,7 +14,9 @@ export type DashboardLoan = {
   // Days since the last interest payment (or the loan date if none). Drives the
   // overdue flag — a loan is overdue when interest hasn't been paid for a while.
   overdueDays: number;
-  interestOwedPaise: number;
+  // Interest already collected from the customer (incl. first-month interest
+  // deducted at issuance) — NOT the outstanding balance.
+  interestPaidPaise: number;
   rePledgeBroker?: string | null;
 };
 
@@ -39,7 +41,7 @@ export function DashboardTable({ loans, emptyLabel }: { loans: DashboardLoan[]; 
             <th className="px-4 py-3 font-medium">{t("rePledgeScreen", "status")}</th>
             <th className="px-4 py-3 font-medium text-right">{t("dashboard", "principal")}</th>
             <th className="px-4 py-3 font-medium text-right">{t("dashboard", "daysElapsed")}</th>
-            <th className="px-4 py-3 font-medium text-right">{t("dashboard", "interestOwed")}</th>
+            <th className="px-4 py-3 font-medium text-right">{t("dashboard", "interestPaid")}</th>
           </tr>
         </thead>
         <tbody>
@@ -74,7 +76,7 @@ export function DashboardTable({ loans, emptyLabel }: { loans: DashboardLoan[]; 
                   )}
                 </td>
                 <td className="px-4 py-3 text-right font-mono font-semibold text-wine">
-                  {formatPaise(loan.interestOwedPaise)}
+                  {formatPaise(loan.interestPaidPaise)}
                 </td>
               </tr>
             );
