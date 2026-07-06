@@ -258,6 +258,7 @@ export function LoanDetail({
           paidInterestPaise={loan.payments
             .filter((p) => p.payment_type === "interest")
             .reduce((s, p) => s + p.amount_paise, 0)}
+          blockedByRePledge={activeRePledge != null}
           supabase={supabase}
           onClosed={() => router.refresh()}
         />
@@ -556,6 +557,7 @@ function CloseLoanPanel({
   principalPaise,
   segments,
   paidInterestPaise,
+  blockedByRePledge,
   supabase,
   onClosed,
 }: {
@@ -563,6 +565,7 @@ function CloseLoanPanel({
   principalPaise: number;
   segments: RateSegment[];
   paidInterestPaise: number;
+  blockedByRePledge: boolean;
   supabase: ReturnType<typeof createClient>;
   onClosed: () => void;
 }) {
@@ -616,6 +619,14 @@ function CloseLoanPanel({
   }
 
   const preset = "rounded-full border border-gold-soft px-3 py-1 text-xs hover:bg-ivory-deep";
+
+  if (blockedByRePledge) {
+    return (
+      <div className="ledger-card rounded-2xl border border-gold-soft p-6 text-sm text-ink-soft">
+        {t("loanDetail", "closeBlockedRePledge")}
+      </div>
+    );
+  }
 
   return (
     <div className="ledger-card rounded-2xl border-2 border-wine p-6">

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
-import { computePeriodInterestPaise } from "@/lib/interest";
+import { computePeriodInterestPaise, monthsForPeriod } from "@/lib/interest";
 import { formatPaise, rupeesToPaise, toDateInputValue } from "@/lib/money";
 
 function parseUTCDate(value: string): Date | null {
@@ -44,9 +44,9 @@ export function CalculatorForm() {
     const principalPaise = rupeesToPaise(principalNum);
     const interestPaise = computePeriodInterestPaise(principalPaise, rateNum, start, asOf);
     const totalDays = Math.round((asOf.getTime() - start.getTime()) / MS_PER_DAY);
-    const fullMonths = Math.floor(totalDays / 30);
-    const extraDays = totalDays - fullMonths * 30;
-    const units = extraDays === 0 ? fullMonths : extraDays <= 10 ? fullMonths + 0.5 : fullMonths + 1;
+    // Months label must use the SAME round-up rule as the interest amount
+    // (max(1, ceil(days/30))), or the label contradicts the rupee figure.
+    const units = monthsForPeriod(start, asOf);
 
     return {
       state: "ok" as const,

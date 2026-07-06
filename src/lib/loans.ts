@@ -30,5 +30,10 @@ export function currentRate(segments: RateSegmentRow[]): number | null {
   return open ? open.rate_percent : null;
 }
 
-/** Loans with no payment for this many days or more are flagged as significantly overdue on the dashboard. */
+/**
+ * Loans still open this many days or more after their pledge (loan) date are
+ * flagged as significantly overdue on the dashboard and overdue list. This is
+ * measured from the loan/pledge date (the redemption clock), not from the last
+ * interest payment — matching the classic pawn maturity model.
+ */
 export const OVERDUE_THRESHOLD_DAYS = 90;

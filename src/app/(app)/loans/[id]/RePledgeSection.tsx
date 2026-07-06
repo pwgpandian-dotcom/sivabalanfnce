@@ -104,6 +104,10 @@ export function RePledgeSection({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.brokerId) {
+      setError(t("rePledge", "brokerRequired"));
+      return;
+    }
     if (!form.tag.trim()) {
       setError(t("rePledge", "tagRequired"));
       return;

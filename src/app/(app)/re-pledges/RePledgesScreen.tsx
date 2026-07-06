@@ -26,6 +26,23 @@ export function RePledgesScreen({
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "redeemed">("all");
   const [busy, setBusy] = useState<null | "pdf" | "excel">(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rePledges.filter((r) => {
+      if (status !== "all" && r.status !== status) return false;
+      if (!q) return true;
+      return (
+        r.broker.toLowerCase().includes(q) ||
+        r.loanNumber.toLowerCase().includes(q) ||
+        r.customerName.toLowerCase().includes(q) ||
+        (r.customerPhone ?? "").toLowerCase().includes(q) ||
+        (r.receiptNumber ?? "").toLowerCase().includes(q) ||
+        (r.tagNumber ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [rePledges, search, status]);
 
   async function handleExport(kind: "pdf" | "excel") {
     setBusy(kind);
@@ -55,25 +72,17 @@ export function RePledgesScreen({
     }
   }
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rePledges.filter((r) => {
-      if (status !== "all" && r.status !== status) return false;
-      if (!q) return true;
-      return (
-        r.broker.toLowerCase().includes(q) ||
-        r.loanNumber.toLowerCase().includes(q) ||
-        r.customerName.toLowerCase().includes(q) ||
-        (r.customerPhone ?? "").toLowerCase().includes(q) ||
-        (r.receiptNumber ?? "").toLowerCase().includes(q) ||
-        (r.tagNumber ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [rePledges, search, status]);
-
+  // Redeem via the RPC (not a raw update) so it records re_pledge_history and
+  // stamps updated_by/updated_at — matching the loan-detail redeem path.
   async function markRedeemed(id: string) {
+    if (!window.confirm(t("rePledge", "redeemConfirm"))) return;
     const today = new Date().toISOString().slice(0, 10);
-    await supabase.from("re_pledges").update({ status: "redeemed", redeemed_date: today }).eq("id", id);
+    const { error: rpcErr } = await supabase.rpc("redeem_re_pledge", { p_id: id, p_redeemed_date: today });
+    if (rpcErr) {
+      setError(rpcErr.message);
+      return;
+    }
+    setError(null);
     router.refresh();
   }
 
@@ -125,6 +134,8 @@ export function RePledgesScreen({
             </div>
           </div>
 
+          {error && <p className="text-sm text-wine-soft">{error}</p>}
+
           {filtered.length === 0 ? (
             <div className="ledger-card rounded-2xl p-10 text-center text-ink-soft">{t("rePledgeScreen", "empty")}</div>
           ) : (
@@ -135,7 +146,6 @@ export function RePledgesScreen({
                     <th className="px-3 py-3 font-medium">{t("rePledgeScreen", "loan")}</th>
                     <th className="px-3 py-3 font-medium">{t("rePledgeScreen", "broker")}</th>
                     <th className="px-3 py-3 text-right font-medium">{t("rePledgeScreen", "amount")}</th>
-                    <th className="px-3 py-3 text-right font-medium">{t("rePledgeScreen", "rate")}</th>
                     <th className="px-3 py-3 font-medium">{t("rePledgeScreen", "date")}</th>
                     <th className="px-3 py-3 font-medium">{t("rePledgeScreen", "status")}</th>
                     <th className="px-3 py-3 text-right font-medium"></th>
@@ -155,7 +165,6 @@ export function RePledgesScreen({
                         {r.receiptNumber && <div className="font-mono text-[11px] text-ink-soft">{r.receiptNumber}</div>}
                       </td>
                       <td className="px-3 py-3 text-right font-mono">{r.amountPaise != null ? formatPaise(r.amountPaise) : "—"}</td>
-                      <td className="px-3 py-3 text-right font-mono">{r.ratePercent != null ? `${r.ratePercent}%` : "—"}</td>
                       <td className="whitespace-nowrap px-3 py-3 font-mono text-ink-soft">{r.pledgeDate}</td>
                       <td className="px-3 py-3">
                         <span

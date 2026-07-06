@@ -355,6 +355,10 @@ export const dictionary = {
     remarksLabel: { en: "Remarks", ta: "குறிப்புகள்" },
     issuedByLabel: { en: "Issued By", ta: "வழங்கியவர்" },
     receivedByLabel: { en: "Received By", ta: "பெற்றவர்" },
+    closeBlockedRePledge: {
+      en: "This loan is re-pledged with an external broker. Redeem the re-pledge above before closing the loan.",
+      ta: "இந்த கடன் வெளி அடகுதாரரிடம் மறு அடகு வைக்கப்பட்டுள்ளது. கடனை முடிக்கும் முன் மேலே உள்ள மறு அடகை மீட்கவும்.",
+    },
     deleteLoan: { en: "Delete Loan", ta: "கடனை நீக்கு" },
     deleteLoanConfirm: {
       en: "Permanently delete this loan with all its payments, rate history and re-pledges? This cannot be undone.",
@@ -377,6 +381,7 @@ export const dictionary = {
     brokerNamePh: { en: "Broker name", ta: "அடகுதாரர் பெயர்" },
     tagNumber: { en: "External Tag Number", ta: "வெளி டேக் எண்" },
     tagRequired: { en: "Tag number is required.", ta: "டேக் எண் தேவை." },
+    brokerRequired: { en: "Please select a broker (add one if the list is empty).", ta: "அடகுதாரரைத் தேர்வு செய்யவும் (பட்டியல் காலியாக இருந்தால் புதிதாக சேர்க்கவும்)." },
     selectBroker: { en: "Select broker…", ta: "அடகுதாரரைத் தேர்வு…" },
     edit: { en: "Edit", ta: "திருத்து" },
     redeem: { en: "Redeem", ta: "மீட்டெடு" },
