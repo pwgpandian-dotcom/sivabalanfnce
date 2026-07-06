@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise } from "@/lib/money";
+import { LoanActionsMenu } from "@/app/(app)/LoanActionsMenu";
 import type { CustomerWithLoans } from "@/lib/customers";
 
 export type CustomerLoanRow = {
@@ -184,6 +185,7 @@ export function CustomerDetail({ customer }: { customer: CustomerWithLoans }) {
                   <th className="px-3 py-2 text-right font-medium">{t("dashboard", "principal")}</th>
                   <th className="px-3 py-2 font-medium">{t("loanList", "loanDate")}</th>
                   <th className="px-3 py-2 font-medium">{t("customers", "status")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("actions", "title")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -204,6 +206,9 @@ export function CustomerDetail({ customer }: { customer: CustomerWithLoans }) {
                       >
                         {t("loanStatus", loan.status)}
                       </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <LoanActionsMenu loanId={loan.id} loanNumber={loan.loan_number} customerName={customer.name} />
                     </td>
                   </tr>
                 ))}

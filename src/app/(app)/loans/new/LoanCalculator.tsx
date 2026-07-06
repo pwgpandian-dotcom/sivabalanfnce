@@ -23,9 +23,12 @@ function parseUTCDate(value: string): Date | null {
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Self-contained loan calculator. Used both on the standalone /calculator page
- * and embedded inside the New Loan form. When `onUse` is provided a
- * "Use This Calculation" button appears that hands the inputs back to the form.
+ * Self-contained loan calculator. Inputs: loan amount, rate, duration (months)
+ * and interest mode — everything recalculates instantly on any change. Used both
+ * on the standalone /calculator page and embedded inside the New Loan form; when
+ * `onUse` is provided a "Use This Calculation" button hands the inputs to the form.
+ * The chosen months drive a period (months × 30 days) through the same mode-aware
+ * engine as the loan closing settlement.
  */
 export function LoanCalculator({
   onUse,
@@ -39,21 +42,23 @@ export function LoanCalculator({
 
   const [principal, setPrincipal] = useState(initial?.principal ?? "");
   const [rate, setRate] = useState(initial?.rate ?? "");
+  const [months, setMonths] = useState("1");
   const [loanDate, setLoanDate] = useState(initial?.loanDate ?? today);
-  const [closingDate, setClosingDate] = useState(today);
   const [mode, setMode] = useState<InterestMode>(initial?.mode ?? "full_month");
   const [deductFirstMonth, setDeductFirstMonth] = useState(initial?.deductFirstMonth ?? false);
 
   const result = useMemo(() => {
     const principalNum = parseFloat(principal);
     const rateNum = parseFloat(rate);
-    const start = parseUTCDate(loanDate);
-    const end = parseUTCDate(closingDate);
+    const monthsNum = parseFloat(months);
+    const start = parseUTCDate(loanDate) ?? new Date(Date.UTC(2000, 0, 1));
 
-    if (!principal || !rate || Number.isNaN(principalNum) || Number.isNaN(rateNum) || !start || !end) {
+    if (!principal || !rate || Number.isNaN(principalNum) || Number.isNaN(rateNum)) {
       return { state: "empty" as const };
     }
-    if (end < start) return { state: "invalid" as const };
+    const safeMonths = Number.isNaN(monthsNum) || monthsNum < 0 ? 0 : monthsNum;
+    // Derive a closing date from the duration so the mode-aware engine applies.
+    const end = new Date(start.getTime() + Math.round(safeMonths * 30) * MS_PER_DAY);
 
     const calc = computeLoan({
       principalPaise: rupeesToPaise(principalNum),
@@ -63,9 +68,8 @@ export function LoanCalculator({
       mode,
       deductFirstMonthInterest: deductFirstMonth,
     });
-    const totalDays = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY);
-    return { state: "ok" as const, calc, totalDays };
-  }, [principal, rate, loanDate, closingDate, mode, deductFirstMonth]);
+    return { state: "ok" as const, calc };
+  }, [principal, rate, months, loanDate, mode, deductFirstMonth]);
 
   const input =
     "rounded-lg border border-gold-soft bg-ivory px-3 py-2 font-mono text-ink outline-none focus:border-wine";
@@ -86,12 +90,12 @@ export function LoanCalculator({
             <input type="number" step="0.01" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} className={input} />
           </label>
           <label className="flex flex-col gap-1 text-sm text-ink-soft">
-            {t("loanCalc", "loanDate")}
-            <input type="date" value={loanDate} onChange={(e) => setLoanDate(e.target.value)} className={input} />
+            {t("loanCalc", "duration")}
+            <input type="number" step="0.5" min="0" inputMode="decimal" value={months} onChange={(e) => setMonths(e.target.value)} className={input} />
           </label>
           <label className="flex flex-col gap-1 text-sm text-ink-soft">
-            {t("loanCalc", "closingDate")}
-            <input type="date" value={closingDate} onChange={(e) => setClosingDate(e.target.value)} className={input} />
+            {t("loanCalc", "loanDate")}
+            <input type="date" value={loanDate} onChange={(e) => setLoanDate(e.target.value)} className={input} />
           </label>
         </div>
 
@@ -117,17 +121,15 @@ export function LoanCalculator({
       <div className="ledger-card ledger-rule flex flex-col justify-center rounded-2xl p-5">
         {result.state === "ok" ? (
           <div className="flex flex-col gap-2 text-sm">
-            <Row label={t("loanCalc", "period")} value={`${result.totalDays} ${t("loanCalc", "days")} · ${result.calc.months.toFixed(2)} ${t("loanCalc", "months")}`} />
+            <Row label={`${t("loanCalc", "period")} (${t("loanCalc", "months")})`} value={result.calc.months.toFixed(2)} />
             <Row label={t("loanCalc", "monthlyInterest")} value={formatPaise(result.calc.monthlyInterestPaise)} />
             <Row label={t("loanCalc", "totalInterest")} value={formatPaise(result.calc.totalInterestPaise)} />
             {deductFirstMonth && (
-              <>
-                <Row label={t("loanCalc", "interestDeducted")} value={`− ${formatPaise(result.calc.firstMonthInterestPaise)}`} />
-                <Row label={t("loanCalc", "amountGiven")} value={formatPaise(result.calc.amountGivenPaise)} strong />
-              </>
+              <Row label={t("loanCalc", "interestDeducted")} value={`− ${formatPaise(result.calc.firstMonthInterestPaise)}`} />
             )}
+            <Row label={t("loanCalc", "amountGiven")} value={formatPaise(result.calc.amountGivenPaise)} strong />
             <div className="mt-1 rounded-xl bg-wine p-3 text-onwine">
-              <div className="text-[10px] uppercase tracking-wide text-gold-soft">{t("loanCalc", "finalSettlement")}</div>
+              <div className="text-[10px] uppercase tracking-wide text-gold-soft">{t("loanCalc", "amountCustomerPays")}</div>
               <div className="font-mono text-2xl font-bold text-gold-bright">{formatPaise(result.calc.finalSettlementPaise)}</div>
             </div>
             {onUse && (
@@ -140,8 +142,6 @@ export function LoanCalculator({
               </button>
             )}
           </div>
-        ) : result.state === "invalid" ? (
-          <p className="text-center text-sm text-wine-soft">{t("loanCalc", "invalidDates")}</p>
         ) : (
           <p className="text-center text-sm text-ink-soft">{t("loanCalc", "enterValues")}</p>
         )}

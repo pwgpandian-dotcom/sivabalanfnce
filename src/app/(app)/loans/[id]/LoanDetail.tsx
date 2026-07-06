@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise, rupeesToPaise, toDateInputValue } from "@/lib/money";
@@ -66,7 +66,9 @@ export function LoanDetail({
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const isActive = loan.status === "active";
-  const [editing, setEditing] = useState(false);
+  const searchParams = useSearchParams();
+  // Open the edit form directly when arriving via the "Edit" action (?edit=1).
+  const [editing, setEditing] = useState(searchParams.get("edit") === "1");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 

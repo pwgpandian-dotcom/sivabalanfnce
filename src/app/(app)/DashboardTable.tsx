@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise } from "@/lib/money";
 import { OVERDUE_THRESHOLD_DAYS } from "@/lib/loans";
+import { LoanActionsMenu } from "./LoanActionsMenu";
 
 export type DashboardLoan = {
   id: string;
@@ -42,6 +43,7 @@ export function DashboardTable({ loans, emptyLabel }: { loans: DashboardLoan[]; 
             <th className="px-4 py-3 font-medium text-right">{t("dashboard", "principal")}</th>
             <th className="px-4 py-3 font-medium text-right">{t("dashboard", "daysElapsed")}</th>
             <th className="px-4 py-3 font-medium text-right">{t("dashboard", "interestPaid")}</th>
+            <th className="px-4 py-3 text-right font-medium">{t("actions", "title")}</th>
           </tr>
         </thead>
         <tbody>
@@ -77,6 +79,9 @@ export function DashboardTable({ loans, emptyLabel }: { loans: DashboardLoan[]; 
                 </td>
                 <td className="px-4 py-3 text-right font-mono font-semibold text-wine">
                   {formatPaise(loan.interestPaidPaise)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <LoanActionsMenu loanId={loan.id} loanNumber={loan.loanNumber} customerName={loan.customerName} />
                 </td>
               </tr>
             );

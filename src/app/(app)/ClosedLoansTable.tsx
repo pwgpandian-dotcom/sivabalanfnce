@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise } from "@/lib/money";
+import { LoanActionsMenu } from "./LoanActionsMenu";
 
 export type ClosedLoan = {
   id: string;
@@ -36,6 +37,7 @@ export function ClosedLoansTable({ loans }: { loans: ClosedLoan[] }) {
             <th className="px-4 py-3 font-medium">{t("loanList", "loanDate")}</th>
             <th className="px-4 py-3 font-medium">{t("loanList", "closedDate")}</th>
             <th className="px-4 py-3 text-right font-medium">{t("loanList", "collected")}</th>
+            <th className="px-4 py-3 text-right font-medium">{t("actions", "title")}</th>
           </tr>
         </thead>
         <tbody>
@@ -52,6 +54,9 @@ export function ClosedLoansTable({ loans }: { loans: ClosedLoan[] }) {
               <td className="whitespace-nowrap px-4 py-3 font-mono text-ink-soft">{loan.closedDate ?? "—"}</td>
               <td className="px-4 py-3 text-right font-mono font-semibold text-gold">
                 {formatPaise(loan.collectedPaise)}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <LoanActionsMenu loanId={loan.id} loanNumber={loan.loanNumber} customerName={loan.customerName} />
               </td>
             </tr>
           ))}

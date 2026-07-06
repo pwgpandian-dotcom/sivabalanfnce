@@ -8,6 +8,7 @@ import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise, toDateInputValue } from "@/lib/money";
 import type { RePledgeRow, CandidateRow } from "@/lib/rePledges";
 import { exportRePledgesPdf, exportRePledgesExcel } from "./rePledgeExport";
+import { LoanActionsMenu } from "../LoanActionsMenu";
 
 export function RePledgesScreen({
   rePledges,
@@ -176,17 +177,14 @@ export function RePledgesScreen({
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right text-xs">
-                        {r.status === "active" && (
-                          <button onClick={() => markRedeemed(r.id)} className="text-wine hover:underline">
-                            {t("rePledge", "markRedeemed")}
-                          </button>
-                        )}
-                        <Link href={`/loans/${r.loanId}`} className="ml-3 text-wine hover:underline">
-                          {t("rePledgeScreen", "viewLoan")}
-                        </Link>
-                        <Link href={`/receipt/${r.loanId}`} className="ml-3 text-ink-soft hover:underline">
-                          {t("loanDetail", "printReceipt").split(" ")[0]}
-                        </Link>
+                        <div className="flex items-center justify-end gap-3">
+                          {r.status === "active" && (
+                            <button onClick={() => markRedeemed(r.id)} className="text-wine hover:underline">
+                              {t("rePledge", "markRedeemed")}
+                            </button>
+                          )}
+                          <LoanActionsMenu loanId={r.loanId} loanNumber={r.loanNumber} customerName={r.customerName} />
+                        </div>
                       </td>
                     </tr>
                   ))}
