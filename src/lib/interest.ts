@@ -1,9 +1,18 @@
 /**
  * Mirrors the `compute_period_interest` / `calculate_interest` Postgres
- * functions in supabase/migrations/0001_init.sql exactly. Used for instant
- * client-side previews; the RPC call remains the source of truth for any
- * persisted value.
+ * functions in supabase/migrations exactly. Used for instant client-side
+ * previews; the RPC call remains the source of truth for any persisted value.
+ *
+ * Interest is charged in "month units". How a partial month rounds depends on
+ * the loan's interest mode (see InterestMode below). The shop's default is
+ * "full_month" — a partial month is NOT rounded up to a whole extra month.
  */
+
+export type InterestMode = "full_month" | "half_month" | "exact_days";
+
+export const DEFAULT_INTEREST_MODE: InterestMode = "full_month";
+
+export const INTEREST_MODES: InterestMode[] = ["full_month", "half_month", "exact_days"];
 
 export interface RateSegment {
   ratePercent: number;
@@ -19,18 +28,40 @@ function daysBetween(start: Date, end: Date): number {
 }
 
 /**
- * Whole months charged for a period, using the round-up rule: any partial month
- * rounds up to the next full month, with a minimum of 1 month.
- *   1–30 days → 1 month, 31–60 → 2, 61–90 → 3, "2 months 10 days" (70) → 3.
+ * Month units charged for a period, according to the interest mode:
+ *   - full_month:  completed whole months only, minimum 1. 35d → 1, 65d → 2.
+ *   - half_month:  completed months + (extra days ≤15 → +0.5, else +1), min 1.
+ *                  35d → 1.5, 46d → 2, 12d → 1.
+ *   - exact_days:  precise day proration, days / 30 (no rounding, no minimum).
+ *                  35d → 1.1666…, 15d → 0.5.
  */
-export function monthsForPeriod(startDate: Date, endDate: Date): number {
+export function monthsForPeriod(
+  startDate: Date,
+  endDate: Date,
+  mode: InterestMode = DEFAULT_INTEREST_MODE
+): number {
   const totalDays = daysBetween(startDate, endDate);
   if (totalDays < 0) {
     throw new Error(
       `end_date (${endDate.toISOString()}) must not be before start_date (${startDate.toISOString()})`
     );
   }
-  return Math.max(1, Math.ceil(totalDays / 30));
+
+  const fullMonths = Math.floor(totalDays / 30);
+  const extraDays = totalDays - fullMonths * 30;
+
+  switch (mode) {
+    case "exact_days":
+      return totalDays / 30;
+    case "half_month": {
+      let units = fullMonths;
+      if (extraDays > 0) units += extraDays <= 15 ? 0.5 : 1;
+      return Math.max(1, units);
+    }
+    case "full_month":
+    default:
+      return Math.max(1, fullMonths);
+  }
 }
 
 /** Interest for a given number of months (supports fractional manual overrides). */
@@ -38,14 +69,15 @@ export function interestForMonths(principalPaise: number, ratePercent: number, m
   return Math.round(principalPaise * (ratePercent / 100) * months);
 }
 
-/** Interest for a single rate segment using the round-up (min 1 month) rule. */
+/** Interest for a single rate segment using the given interest mode. */
 export function computePeriodInterestPaise(
   principalPaise: number,
   ratePercent: number,
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  mode: InterestMode = DEFAULT_INTEREST_MODE
 ): number {
-  return interestForMonths(principalPaise, ratePercent, monthsForPeriod(startDate, endDate));
+  return interestForMonths(principalPaise, ratePercent, monthsForPeriod(startDate, endDate, mode));
 }
 
 /**
@@ -56,7 +88,8 @@ export function computePeriodInterestPaise(
 export function calculateInterestPaise(
   principalPaise: number,
   segments: RateSegment[],
-  asOfDate: Date
+  asOfDate: Date,
+  mode: InterestMode = DEFAULT_INTEREST_MODE
 ): number {
   return segments
     .filter((seg) => seg.effectiveFrom <= asOfDate)
@@ -65,7 +98,8 @@ export function calculateInterestPaise(
       const segEnd =
         seg.effectiveTo !== null && seg.effectiveTo < asOfDate ? seg.effectiveTo : asOfDate;
       return (
-        total + computePeriodInterestPaise(principalPaise, seg.ratePercent, seg.effectiveFrom, segEnd)
+        total +
+        computePeriodInterestPaise(principalPaise, seg.ratePercent, seg.effectiveFrom, segEnd, mode)
       );
     }, 0);
 }

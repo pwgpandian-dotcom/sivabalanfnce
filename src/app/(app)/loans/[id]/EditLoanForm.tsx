@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { rupeesToPaise } from "@/lib/money";
+import { type InterestMode } from "@/lib/interest";
 
 export type LoanEdit = { id: string; edited_at: string; previous: Record<string, unknown> };
 
@@ -24,6 +25,7 @@ export type EditLoanValues = {
   ratePercent: number | null;
   issuedBy: string | null;
   receivedBy: string | null;
+  interestMode: InterestMode;
 };
 
 export function EditLoanForm({
@@ -50,10 +52,13 @@ export function EditLoanForm({
   const [rate, setRate] = useState(loan.ratePercent != null ? String(loan.ratePercent) : "");
   const [issuedBy, setIssuedBy] = useState(loan.issuedBy ?? "");
   const [receivedBy, setReceivedBy] = useState(loan.receivedBy ?? "");
+  const [interestMode, setInterestMode] = useState<InterestMode>(loan.interestMode ?? "full_month");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const input = "rounded-lg border border-gold-soft bg-ivory px-3 py-2 text-ink outline-none focus:border-wine";
+  const pill = (active: boolean) =>
+    `rounded-full px-3 py-1 text-xs ${active ? "bg-wine text-onwine" : "border border-gold-soft hover:bg-ivory-deep"}`;
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -80,6 +85,7 @@ export function EditLoanForm({
         p_issued_by: issuedBy.trim() || null,
         p_received_by: receivedBy.trim() || null,
         p_item_count: itemCount ? Math.max(1, parseInt(itemCount, 10) || 1) : 1,
+        p_interest_mode: interestMode,
       });
       if (rpcErr) throw new Error(rpcErr.message);
 
@@ -157,6 +163,16 @@ export function EditLoanForm({
           {t("newLoan", "receivedBy")}
           <input value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder={t("newLoan", "enterName")} className={input} />
         </label>
+      </div>
+
+      {/* Interest calculation mode */}
+      <div className="flex flex-col gap-1 text-sm text-ink-soft">
+        {t("newLoan", "interestMode")}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setInterestMode("full_month")} className={pill(interestMode === "full_month")}>{t("newLoan", "modeFullMonth")}</button>
+          <button type="button" onClick={() => setInterestMode("half_month")} className={pill(interestMode === "half_month")}>{t("newLoan", "modeHalfMonth")}</button>
+          <button type="button" onClick={() => setInterestMode("exact_days")} className={pill(interestMode === "exact_days")}>{t("newLoan", "modeExactDays")}</button>
+        </div>
       </div>
 
       <label className="flex flex-col gap-1 text-sm text-ink-soft">

@@ -6,36 +6,58 @@ import {
   interestForMonths,
   type RateSegment,
 } from "../interest";
+import { computeLoan } from "../loanCalc";
 
 const d = (y: number, m: number, day: number) => new Date(Date.UTC(y, m - 1, day));
 
-describe("monthsForPeriod (round-up, min 1)", () => {
+describe("monthsForPeriod — full_month (default: floor, min 1)", () => {
   it("charges a minimum of 1 month for a zero-day period", () => {
     expect(monthsForPeriod(d(2023, 1, 1), d(2023, 1, 1))).toBe(1);
   });
-  it("charges 1 month for 1–30 days", () => {
-    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 1, 31))).toBe(1); // 30 days
+  it("30 days => 1 month", () => {
+    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 1, 31))).toBe(1);
   });
-  it("rounds 31 days up to 2 months", () => {
-    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 2, 1))).toBe(2); // 31 days
+  it("35 days => 1 month (no extra month added)", () => {
+    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 2, 5))).toBe(1); // 35 days
   });
-  it("charges 2 months for exactly 60 days", () => {
-    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 3, 2))).toBe(2); // 60 days
+  it("60 days => 2 months", () => {
+    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 3, 2))).toBe(2);
   });
-  it("rounds '2 months 10 days' (70 days) up to 3 months", () => {
-    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 3, 12))).toBe(3); // 70 days
+  it("70 days => 2 months (floor, not 3)", () => {
+    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 3, 12))).toBe(2);
+  });
+});
+
+describe("monthsForPeriod — half_month (extra ≤15 days → +0.5)", () => {
+  it("35 days => 1.5 months", () => {
+    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 2, 5), "half_month")).toBe(1.5);
+  });
+  it("46 days => 2 months (extra 16 > 15)", () => {
+    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 2, 16), "half_month")).toBe(2);
+  });
+  it("15 days => 1 month (minimum)", () => {
+    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 1, 16), "half_month")).toBe(1);
+  });
+});
+
+describe("monthsForPeriod — exact_days (days / 30)", () => {
+  it("35 days => 35/30 months", () => {
+    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 2, 5), "exact_days")).toBeCloseTo(35 / 30, 6);
+  });
+  it("15 days => 0.5 months", () => {
+    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 1, 16), "exact_days")).toBeCloseTo(0.5, 6);
   });
 });
 
 describe("computePeriodInterestPaise", () => {
-  it("uses round-up months (0 days => 1 month)", () => {
-    expect(computePeriodInterestPaise(100_000, 10, d(2023, 1, 1), d(2023, 1, 1))).toBe(10_000);
+  it("full_month: 35 days => 1 month", () => {
+    expect(computePeriodInterestPaise(100_000, 10, d(2023, 1, 1), d(2023, 2, 5))).toBe(10_000);
   });
-  it("31 days => 2 months", () => {
-    expect(computePeriodInterestPaise(100_000, 10, d(2023, 1, 1), d(2023, 2, 1))).toBe(20_000);
+  it("half_month: 35 days => 1.5 months", () => {
+    expect(computePeriodInterestPaise(100_000, 10, d(2023, 1, 1), d(2023, 2, 5), "half_month")).toBe(15_000);
   });
-  it("70 days => 3 months", () => {
-    expect(computePeriodInterestPaise(100_000, 10, d(2023, 1, 1), d(2023, 3, 12))).toBe(30_000);
+  it("exact_days: 15 days => 0.5 months", () => {
+    expect(computePeriodInterestPaise(100_000, 10, d(2023, 1, 1), d(2023, 1, 16), "exact_days")).toBe(5_000);
   });
   it("rejects an end date before the start date", () => {
     expect(() => computePeriodInterestPaise(100_000, 10, d(2023, 2, 1), d(2023, 1, 1))).toThrow();
@@ -44,31 +66,20 @@ describe("computePeriodInterestPaise", () => {
 
 describe("interestForMonths (manual override)", () => {
   it("supports fractional months", () => {
-    expect(interestForMonths(100_000, 12, 2.5)).toBe(30_000); // 100000*0.12*2.5
+    expect(interestForMonths(100_000, 12, 2.5)).toBe(30_000);
   });
 });
 
 describe("calculateInterestPaise", () => {
-  it("sums round-up months across a rate change", () => {
+  it("sums full_month across a rate change", () => {
     const principalPaise = 700_000; // ₹7000
     const segments: RateSegment[] = [
-      { ratePercent: 12, effectiveFrom: d(2022, 11, 27), effectiveTo: d(2023, 2, 28) },
+      { ratePercent: 12, effectiveFrom: d(2023, 1, 1), effectiveTo: d(2023, 2, 28) },
       { ratePercent: 15, effectiveFrom: d(2023, 3, 1), effectiveTo: null },
     ];
-    // Segment 1: 93 days -> ceil = 4 months -> 700000*0.12*4 = 336000
-    // Segment 2: 19 days -> 1 month       -> 700000*0.15*1 = 105000
-    expect(calculateInterestPaise(principalPaise, segments, d(2023, 3, 20))).toBe(441_000);
-  });
-
-  it("sums correctly across 3+ rate changes (each ~1 month)", () => {
-    const principalPaise = 100_000;
-    const segments: RateSegment[] = [
-      { ratePercent: 12, effectiveFrom: d(2023, 1, 1), effectiveTo: d(2023, 1, 30) },
-      { ratePercent: 13, effectiveFrom: d(2023, 1, 31), effectiveTo: d(2023, 3, 1) },
-      { ratePercent: 14, effectiveFrom: d(2023, 3, 2), effectiveTo: d(2023, 3, 31) },
-      { ratePercent: 15, effectiveFrom: d(2023, 4, 1), effectiveTo: null },
-    ];
-    expect(calculateInterestPaise(principalPaise, segments, d(2023, 5, 1))).toBe(54_000);
+    // Segment 1: 58 days -> floor = 1 month -> 700000*0.12*1 = 84000
+    // Segment 2: 19 days -> min 1 month     -> 700000*0.15*1 = 105000
+    expect(calculateInterestPaise(principalPaise, segments, d(2023, 3, 20))).toBe(189_000);
   });
 
   it("ignores segments that start after asOfDate", () => {
@@ -86,5 +97,46 @@ describe("calculateInterestPaise", () => {
     const principalPaise = 700_000;
     const segments: RateSegment[] = [{ ratePercent: 12, effectiveFrom: d(2023, 1, 1), effectiveTo: null }];
     expect(calculateInterestPaise(principalPaise, segments, d(2023, 1, 1))).toBe(84_000);
+  });
+});
+
+describe("computeLoan — first month interest deduction", () => {
+  it("hands over principal minus one month's interest when deducted", () => {
+    const r = computeLoan({
+      principalPaise: 500_000, // ₹5000
+      ratePercent: 2,
+      startDate: d(2026, 6, 1),
+      endDate: d(2026, 6, 1),
+      deductFirstMonthInterest: true,
+    });
+    expect(r.monthlyInterestPaise).toBe(10_000); // ₹100
+    expect(r.firstMonthInterestPaise).toBe(10_000);
+    expect(r.amountGivenPaise).toBe(490_000); // ₹4900 handed over
+  });
+
+  it("hands over the full principal when not deducted", () => {
+    const r = computeLoan({
+      principalPaise: 500_000,
+      ratePercent: 2,
+      startDate: d(2026, 6, 1),
+      endDate: d(2026, 6, 1),
+      deductFirstMonthInterest: false,
+    });
+    expect(r.firstMonthInterestPaise).toBe(0);
+    expect(r.amountGivenPaise).toBe(500_000);
+  });
+
+  it("credits the deducted first month at closing (no double charge)", () => {
+    // One month later, full_month => 1 month total interest; first month already paid.
+    const r = computeLoan({
+      principalPaise: 500_000,
+      ratePercent: 2,
+      startDate: d(2026, 6, 1),
+      endDate: d(2026, 7, 1), // 30 days -> 1 month
+      deductFirstMonthInterest: true,
+    });
+    expect(r.totalInterestPaise).toBe(10_000);
+    expect(r.balanceInterestPaise).toBe(0);
+    expect(r.finalSettlementPaise).toBe(500_000);
   });
 });

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise, rupeesToPaise, toDateInputValue } from "@/lib/money";
 import { currentInterestOwed, currentRate, toRateSegments } from "@/lib/loans";
-import { calculateInterestPaise, monthsForPeriod, interestForMonths } from "@/lib/interest";
+import { calculateInterestPaise, monthsForPeriod, interestForMonths, type InterestMode } from "@/lib/interest";
 import { RePledgeSection, type RePledge, type RePledgeHistory } from "./RePledgeSection";
 import { EditLoanForm, type LoanEdit } from "./EditLoanForm";
 
@@ -42,6 +42,9 @@ export type LoanDetailData = {
   remarks: string | null;
   issued_by: string | null;
   received_by: string | null;
+  interest_mode: InterestMode | null;
+  first_month_interest_deducted: boolean | null;
+  first_month_interest_paise: number | null;
   customers: { id: string; name: string; phone: string | null; address: string | null };
   interest_rate_segments: RateSegment[];
   payments: Payment[];
@@ -81,9 +84,10 @@ export function LoanDetail({
     router.refresh();
   }
 
+  const mode: InterestMode = loan.interest_mode ?? "full_month";
   const interestOwed = useMemo(
-    () => currentInterestOwed(loan.principal_paise, loan.interest_rate_segments),
-    [loan.principal_paise, loan.interest_rate_segments]
+    () => currentInterestOwed(loan.principal_paise, loan.interest_rate_segments, mode),
+    [loan.principal_paise, loan.interest_rate_segments, mode]
   );
   const rateNow = currentRate(loan.interest_rate_segments);
   const activeRePledge = loan.re_pledges.find((r) => r.status === "active") ?? null;
@@ -159,6 +163,7 @@ export function LoanDetail({
                 ratePercent: rateNow,
                 issuedBy: loan.issued_by,
                 receivedBy: loan.received_by,
+                interestMode: mode,
               }}
             />
           </div>
@@ -176,7 +181,15 @@ export function LoanDetail({
           <Field label={t("loanDetail", "itemCountLabel")} value={`${loan.item_count ?? 1} ${t("newLoan", "itemsUnit")}`} mono />
           <Field label={t("loanDetail", "issuedByLabel")} value={loan.issued_by || "—"} />
           <Field label={t("loanDetail", "receivedByLabel")} value={loan.received_by || "—"} />
+          <Field label={t("loanDetail", "interestModeLabel")} value={t("loanDetail", mode === "half_month" ? "halfMonth" : mode === "exact_days" ? "exactDays" : "fullMonth")} />
         </div>
+
+        {loan.first_month_interest_deducted && (
+          <div className="border-b border-gold-soft py-3 text-sm text-ink-soft">
+            <span className="font-medium text-wine">{t("loanDetail", "firstMonthDeductedLabel")}</span>
+            {loan.first_month_interest_paise ? ` — ${formatPaise(loan.first_month_interest_paise)}` : ""}
+          </div>
+        )}
 
         <div className="py-5">
           <h2 className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-soft">
@@ -258,6 +271,8 @@ export function LoanDetail({
           paidInterestPaise={loan.payments
             .filter((p) => p.payment_type === "interest")
             .reduce((s, p) => s + p.amount_paise, 0)}
+          initialMode={mode}
+          firstMonthDeducted={loan.first_month_interest_deducted ?? false}
           blockedByRePledge={activeRePledge != null}
           supabase={supabase}
           onClosed={() => router.refresh()}
@@ -549,7 +564,6 @@ function PaymentsSection({
   );
 }
 
-const MS_DAY = 24 * 60 * 60 * 1000;
 const parseUTC = (s: string) => new Date(s + "T00:00:00Z");
 
 function CloseLoanPanel({
@@ -557,6 +571,8 @@ function CloseLoanPanel({
   principalPaise,
   segments,
   paidInterestPaise,
+  initialMode,
+  firstMonthDeducted,
   blockedByRePledge,
   supabase,
   onClosed,
@@ -565,6 +581,8 @@ function CloseLoanPanel({
   principalPaise: number;
   segments: RateSegment[];
   paidInterestPaise: number;
+  initialMode: InterestMode;
+  firstMonthDeducted: boolean;
   blockedByRePledge: boolean;
   supabase: ReturnType<typeof createClient>;
   onClosed: () => void;
@@ -572,7 +590,8 @@ function CloseLoanPanel({
   const { t } = useLocale();
   const [confirming, setConfirming] = useState(false);
   const [closedDate, setClosedDate] = useState(toDateInputValue(new Date()));
-  const [monthsOverride, setMonthsOverride] = useState<string>(""); // "" = auto (round-up)
+  const [mode, setMode] = useState<InterestMode>(initialMode);
+  const [monthsOverride, setMonthsOverride] = useState<string>(""); // "" = auto (from mode)
   const [finalEdited, setFinalEdited] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -581,21 +600,21 @@ function CloseLoanPanel({
   const openSeg = segments.find((s) => s.effective_to === null) ?? segments[segments.length - 1];
   const currentRate = openSeg?.rate_percent ?? 0;
 
-  // Everything below recomputes live from the chosen closed date + month override.
+  // Everything below recomputes live from the chosen closed date + interest mode.
   const asOf = parseUTC(closedDate);
   const openStart = openSeg ? parseUTC(openSeg.effective_from) : asOf;
-  const autoMonths = monthsForPeriod(openStart, asOf);
-  const exactMonths = Math.max(0, Math.round((asOf.getTime() - openStart.getTime()) / MS_DAY)) / 30;
+  const autoMonths = monthsForPeriod(openStart, asOf, mode);
 
   const months = monthsOverride !== "" && !Number.isNaN(parseFloat(monthsOverride)) ? parseFloat(monthsOverride) : autoMonths;
 
   // Interest from any already-closed (past) rate segments stays fixed; only the
   // current open segment's months are adjustable.
-  const autoInterestAtClose = calculateInterestPaise(principalPaise, rateSegs, asOf);
+  const autoInterestAtClose = calculateInterestPaise(principalPaise, rateSegs, asOf, mode);
   const openInterestAuto = interestForMonths(principalPaise, currentRate, autoMonths);
   const pastInterest = Math.max(0, autoInterestAtClose - openInterestAuto);
 
   const originalInterest = pastInterest + interestForMonths(principalPaise, currentRate, months);
+  // Interest already collected (incl. any first-month deducted at issuance) is credited.
   const balanceInterest = Math.max(0, originalInterest - paidInterestPaise);
   const settlementPaise = principalPaise + balanceInterest;
   const finalAmount = finalEdited ?? (settlementPaise / 100).toFixed(2);
@@ -609,6 +628,7 @@ function CloseLoanPanel({
       p_final_payment_amount_paise: rupeesToPaise(parseFloat(finalAmount)),
       p_manual_interest_override_paise: balanceInterest,
       p_manual_principal_override_paise: null,
+      p_interest_mode: mode,
     });
     setSubmitting(false);
     if (rpcError) {
@@ -618,7 +638,8 @@ function CloseLoanPanel({
     onClosed();
   }
 
-  const preset = "rounded-full border border-gold-soft px-3 py-1 text-xs hover:bg-ivory-deep";
+  const modeBtn = (active: boolean) =>
+    `rounded-full px-3 py-1 text-xs ${active ? "bg-wine text-onwine" : "border border-gold-soft hover:bg-ivory-deep"}`;
 
   if (blockedByRePledge) {
     return (
@@ -673,23 +694,24 @@ function CloseLoanPanel({
             </span>
           </div>
 
-          {/* Manual override presets */}
+          {/* Interest mode — drives the calculation (req 3). */}
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => { setMonthsOverride(String(autoMonths)); setFinalEdited(null); }} className={preset}>
+            <button type="button" onClick={() => { setMode("full_month"); setMonthsOverride(""); setFinalEdited(null); }} className={modeBtn(mode === "full_month")}>
               {t("loanDetail", "fullMonth")}
             </button>
-            <button type="button" onClick={() => { setMonthsOverride(String(Math.max(0.5, autoMonths - 0.5))); setFinalEdited(null); }} className={preset}>
+            <button type="button" onClick={() => { setMode("half_month"); setMonthsOverride(""); setFinalEdited(null); }} className={modeBtn(mode === "half_month")}>
               {t("loanDetail", "halfMonth")}
             </button>
-            <button type="button" onClick={() => { setMonthsOverride(exactMonths.toFixed(2)); setFinalEdited(null); }} className={preset}>
+            <button type="button" onClick={() => { setMode("exact_days"); setMonthsOverride(""); setFinalEdited(null); }} className={modeBtn(mode === "exact_days")}>
               {t("loanDetail", "exactDays")}
             </button>
           </div>
 
-          {/* Settlement breakdown */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-gold-soft bg-ivory-deep/40 p-3 text-sm sm:grid-cols-4">
+          {/* Settlement breakdown (req 8) */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-gold-soft bg-ivory-deep/40 p-3 text-sm sm:grid-cols-3 lg:grid-cols-5">
+            <Field label={t("newLoan", "principal")} value={formatPaise(principalPaise)} mono />
             <Field label={t("loanDetail", "originalInterest")} value={formatPaise(originalInterest)} mono />
-            <Field label={t("loanDetail", "paidInterest")} value={formatPaise(paidInterestPaise)} mono />
+            <Field label={firstMonthDeducted ? t("loanDetail", "firstMonthDeductedLabel") : t("loanDetail", "paidInterest")} value={formatPaise(paidInterestPaise)} mono />
             <Field label={t("loanDetail", "balanceInterest")} value={formatPaise(balanceInterest)} mono />
             <Field label={t("loanDetail", "finalSettlement")} value={formatPaise(settlementPaise)} mono highlight />
           </div>

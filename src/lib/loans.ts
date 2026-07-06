@@ -1,4 +1,4 @@
-import { calculateInterestPaise, type RateSegment } from "@/lib/interest";
+import { calculateInterestPaise, type RateSegment, type InterestMode, DEFAULT_INTEREST_MODE } from "@/lib/interest";
 import { toDateInputValue } from "@/lib/money";
 
 export type RateSegmentRow = {
@@ -20,10 +20,14 @@ export function toRateSegments(rows: RateSegmentRow[]): RateSegment[] {
 }
 
 /** Instant client/server-side preview of interest owed as of today, mirroring calculate_interest() RPC. */
-export function currentInterestOwed(principalPaise: number, segments: RateSegmentRow[]): number {
+export function currentInterestOwed(
+  principalPaise: number,
+  segments: RateSegmentRow[],
+  mode: InterestMode = DEFAULT_INTEREST_MODE
+): number {
   // "Today" in IST (parsed as UTC midnight), consistent with all stored dates.
   const asOf = new Date(toDateInputValue() + "T00:00:00Z");
-  return calculateInterestPaise(principalPaise, toRateSegments(segments), asOf);
+  return calculateInterestPaise(principalPaise, toRateSegments(segments), asOf, mode);
 }
 
 export function currentRate(segments: RateSegmentRow[]): number | null {

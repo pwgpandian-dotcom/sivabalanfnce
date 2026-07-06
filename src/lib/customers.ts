@@ -32,6 +32,11 @@ export type CustomerWithLoans = {
   name: string;
   phone: string | null;
   address: string | null;
+  email: string | null;
+  id_proof_type: string | null;
+  id_number: string | null;
+  notes: string | null;
+  created_at: string;
   loans: CustomerLoanRow[];
 };
 
@@ -44,7 +49,7 @@ export async function loadCustomerWithLoans(
   const { data, error } = await supabase
     .from("customers")
     .select(
-      "id, name, phone, address, loans(id, loan_number, principal_paise, loan_date, closed_date, status)"
+      "id, name, phone, address, email, id_proof_type, id_number, notes, created_at, loans(id, loan_number, principal_paise, loan_date, closed_date, status)"
     )
     .eq("shop_id", shopId)
     .eq("id", customerId)
@@ -62,6 +67,11 @@ export async function loadCustomerWithLoans(
     name: data.name,
     phone: data.phone,
     address: data.address,
+    email: data.email ?? null,
+    id_proof_type: data.id_proof_type ?? null,
+    id_number: data.id_number ?? null,
+    notes: data.notes ?? null,
+    created_at: data.created_at,
     loans,
   };
 }

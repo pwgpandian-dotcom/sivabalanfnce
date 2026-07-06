@@ -13,7 +13,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
     .from("loans")
     .select(
       `loan_number, principal_paise, pledge_item_description, pledge_weight_grams,
-       loan_date, assessed_value_paise,
+       loan_date, assessed_value_paise, issued_by,
        customers(name, address, phone),
        shops(name, owner_name, address, phone),
        interest_rate_segments(rate_percent, effective_to)`
@@ -32,6 +32,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
     pledge_weight_grams: number | null;
     loan_date: string;
     assessed_value_paise: number | null;
+    issued_by: string | null;
     customers: { name: string; address: string | null; phone: string | null } | null;
     shops: { name: string; owner_name: string | null; address: string | null; phone: string | null } | null;
     interest_rate_segments: { rate_percent: number; effective_to: string | null }[];
@@ -56,6 +57,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
     shopAddress: loan.shops?.address ?? null,
     shopPhone: loan.shops?.phone ?? null,
     ratePercent: openSeg?.rate_percent ?? null,
+    issuedBy: loan.issued_by ?? null,
   };
 
   return (

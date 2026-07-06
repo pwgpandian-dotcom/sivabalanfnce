@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
-import { rupeesToPaise, toDateInputValue } from "@/lib/money";
+import { formatPaise, rupeesToPaise, toDateInputValue } from "@/lib/money";
+import { interestForMonths, type InterestMode } from "@/lib/interest";
+import { LoanCalculator, type CalcUseValues } from "./LoanCalculator";
 
 type Customer = { id: string; name: string; phone: string | null };
 
@@ -39,6 +41,9 @@ export function NewLoanForm({
   const [remarks, setRemarks] = useState("");
   const [issuedBy, setIssuedBy] = useState("");
   const [receivedBy, setReceivedBy] = useState("");
+  const [interestMode, setInterestMode] = useState<InterestMode>("full_month");
+  const [deductFirstMonth, setDeductFirstMonth] = useState(false);
+  const [showCalc, setShowCalc] = useState(false);
 
   // Loan number: by default auto (SF-<sequence>, server-assigned). Staff can
   // toggle manual entry to back-fill an old paper record's original number.
@@ -49,6 +54,29 @@ export function NewLoanForm({
   const [error, setError] = useState<string | null>(null);
 
   const visibleResults = !selectedCustomer && !creatingNew ? results : [];
+
+  // Live "what the customer receives" preview (req 7 / 9), recomputed on every change.
+  const preview = useMemo(() => {
+    const p = parseFloat(principal);
+    const r = parseFloat(rate);
+    if (!principal || !rate || Number.isNaN(p) || Number.isNaN(r)) return null;
+    const principalPaise = rupeesToPaise(p);
+    const monthly = interestForMonths(principalPaise, r, 1);
+    const deducted = deductFirstMonth ? monthly : 0;
+    return { principalPaise, monthly, deducted, given: principalPaise - deducted };
+  }, [principal, rate, deductFirstMonth]);
+
+  function applyCalc(v: CalcUseValues) {
+    setPrincipal(v.principal);
+    setRate(v.rate);
+    setLoanDate(v.loanDate);
+    setInterestMode(v.mode);
+    setDeductFirstMonth(v.deductFirstMonth);
+    setShowCalc(false);
+  }
+
+  const pill = (active: boolean) =>
+    `rounded-full px-3 py-1 text-xs ${active ? "bg-wine text-onwine" : "border border-gold-soft hover:bg-ivory-deep"}`;
 
   useEffect(() => {
     if (!query || selectedCustomer || creatingNew) return;
@@ -113,6 +141,9 @@ export function NewLoanForm({
         p_issued_by: issuedBy.trim() || null,
         p_received_by: receivedBy.trim() || null,
         p_item_count: itemCount ? Math.max(1, parseInt(itemCount, 10) || 1) : 1,
+        p_interest_mode: interestMode,
+        p_deduct_first_month_interest: deductFirstMonth,
+        p_first_month_interest_paise: null, // let the server compute one month's interest
       });
 
       if (rpcError) {
@@ -237,6 +268,23 @@ export function NewLoanForm({
         )}
       </div>
 
+      {/* Built-in Loan Calculator (req 10) — populates the form on "Use This Calculation". */}
+      <div className="flex flex-col gap-3 rounded-xl border border-gold-soft bg-ivory-deep/30 p-3">
+        <button
+          type="button"
+          onClick={() => setShowCalc((v) => !v)}
+          className="self-start text-sm font-medium text-wine hover:underline"
+        >
+          {showCalc ? t("newLoan", "hideCalc") : `🧮 ${t("newLoan", "openCalc")}`}
+        </button>
+        {showCalc && (
+          <LoanCalculator
+            onUse={applyCalc}
+            initial={{ principal, rate, loanDate, mode: interestMode, deductFirstMonth }}
+          />
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <label className="col-span-2 flex flex-col gap-1 text-sm text-ink-soft sm:col-span-1">
           {t("newLoan", "pledgeItem")}
@@ -326,6 +374,35 @@ export function NewLoanForm({
         </label>
       </div>
 
+      {/* Interest calculation mode (req 3) */}
+      <div className="flex flex-col gap-1 text-sm text-ink-soft">
+        {t("newLoan", "interestMode")}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setInterestMode("full_month")} className={pill(interestMode === "full_month")}>{t("newLoan", "modeFullMonth")}</button>
+          <button type="button" onClick={() => setInterestMode("half_month")} className={pill(interestMode === "half_month")}>{t("newLoan", "modeHalfMonth")}</button>
+          <button type="button" onClick={() => setInterestMode("exact_days")} className={pill(interestMode === "exact_days")}>{t("newLoan", "modeExactDays")}</button>
+        </div>
+      </div>
+
+      {/* First month interest option (req 7) */}
+      <div className="flex flex-col gap-1 text-sm text-ink-soft">
+        {t("newLoan", "firstMonthTitle")}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setDeductFirstMonth(true)} className={pill(deductFirstMonth)}>{t("newLoan", "deductFirst")}</button>
+          <button type="button" onClick={() => setDeductFirstMonth(false)} className={pill(!deductFirstMonth)}>{t("newLoan", "noDeductFirst")}</button>
+        </div>
+      </div>
+
+      {/* Live preview of what the customer receives (req 7 / 9) */}
+      {preview && (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-xl border border-gold-soft bg-ivory-deep/40 p-4 text-sm sm:grid-cols-4">
+          <PreviewField label={t("newLoan", "principal")} value={formatPaise(preview.principalPaise)} />
+          <PreviewField label={t("newLoan", "monthlyInterest")} value={formatPaise(preview.monthly)} />
+          <PreviewField label={t("newLoan", "interestDeducted")} value={deductFirstMonth ? `− ${formatPaise(preview.deducted)}` : formatPaise(0)} />
+          <PreviewField label={t("newLoan", "amountGiven")} value={formatPaise(preview.given)} highlight />
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
           {t("newLoan", "issuedBy")}
@@ -367,5 +444,14 @@ export function NewLoanForm({
         {submitting ? t("common", "loading") : t("newLoan", "submit")}
       </button>
     </form>
+  );
+}
+
+function PreviewField({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wide text-ink-soft">{label}</div>
+      <div className={`font-mono ${highlight ? "font-semibold text-wine" : "text-ink"}`}>{value}</div>
+    </div>
   );
 }

@@ -19,6 +19,7 @@ export default async function LoanDetailPage({
     .select(
       `id, loan_number, principal_paise, pledge_item_description, pledge_weight_grams,
        loan_date, status, closed_date, item_type, item_count, remarks, issued_by, received_by,
+       interest_mode, first_month_interest_deducted, first_month_interest_paise,
        customers(id, name, phone, address),
        interest_rate_segments(id, rate_percent, effective_from, effective_to),
        payments(id, payment_date, amount_paise, payment_type, auto_calculated_interest_paise, manual_interest_override_paise, manual_principal_override_paise)`

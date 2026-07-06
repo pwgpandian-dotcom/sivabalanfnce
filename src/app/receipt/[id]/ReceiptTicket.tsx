@@ -20,10 +20,14 @@ export type ReceiptData = {
   shopAddress: string | null;
   shopPhone: string | null;
   ratePercent: number | null;
+  issuedBy: string | null;
 };
 
 function rupees(paise: number): string {
-  return (paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  return (paise / 100).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export function ReceiptTicket({ data }: { data: ReceiptData }) {
@@ -114,13 +118,16 @@ export function ReceiptTicket({ data }: { data: ReceiptData }) {
         </tbody>
       </table>
 
-      {/* Footer signature */}
+      {/* Footer signature — prints the issuer's name entered while creating the loan. */}
       <div className="mt-4 flex items-end justify-end">
-        <div className="text-right text-sm">
-          <div className={`${tamilSerif.className} mb-8`} lang="ta">
-            &nbsp;
+        <div className="min-w-[45%] text-right text-sm">
+          <div className={`${tamilSerif.className} mb-8 text-xs`} lang="ta">
+            கையொப்பம் / Signature
           </div>
           <div className="border-t border-black pt-1">For: {BRAND_NAME_TA}</div>
+          {(data.issuedBy || data.ownerName) && (
+            <div className="mt-0.5 font-semibold">{data.issuedBy || data.ownerName}</div>
+          )}
         </div>
       </div>
     </div>
