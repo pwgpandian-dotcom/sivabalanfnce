@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { rupeesToPaise } from "@/lib/money";
-import { StaffSelect } from "../../StaffSelect";
 
-export type StaffLite = { userId: string; name: string };
 export type LoanEdit = { id: string; edited_at: string; previous: Record<string, unknown> };
 
 export type EditLoanValues = {
@@ -20,6 +18,7 @@ export type EditLoanValues = {
   pledgeItem: string;
   pledgeWeightGrams: number | null;
   itemType: "gold" | "silver";
+  itemCount: number;
   loanDate: string;
   remarks: string | null;
   ratePercent: number | null;
@@ -29,11 +28,9 @@ export type EditLoanValues = {
 
 export function EditLoanForm({
   loan,
-  shopId,
   onCancel,
 }: {
   loan: EditLoanValues;
-  shopId: string;
   onCancel: () => void;
 }) {
   const { t } = useLocale();
@@ -47,6 +44,7 @@ export function EditLoanForm({
   const [pledgeItem, setPledgeItem] = useState(loan.pledgeItem);
   const [weight, setWeight] = useState(loan.pledgeWeightGrams != null ? String(loan.pledgeWeightGrams) : "");
   const [itemType, setItemType] = useState<"gold" | "silver">(loan.itemType);
+  const [itemCount, setItemCount] = useState(String(loan.itemCount ?? 1));
   const [loanDate, setLoanDate] = useState(loan.loanDate);
   const [remarks, setRemarks] = useState(loan.remarks ?? "");
   const [rate, setRate] = useState(loan.ratePercent != null ? String(loan.ratePercent) : "");
@@ -79,8 +77,9 @@ export function EditLoanForm({
         p_loan_date: loanDate,
         p_remarks: remarks.trim() || null,
         p_rate_percent: rate ? parseFloat(rate) : null,
-        p_issued_by: issuedBy || null,
-        p_received_by: receivedBy || null,
+        p_issued_by: issuedBy.trim() || null,
+        p_received_by: receivedBy.trim() || null,
+        p_item_count: itemCount ? Math.max(1, parseInt(itemCount, 10) || 1) : 1,
       });
       if (rpcErr) throw new Error(rpcErr.message);
 
@@ -127,6 +126,10 @@ export function EditLoanForm({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "itemCount")}
+          <input type="number" min={1} step={1} value={itemCount} onChange={(e) => setItemCount(e.target.value)} className={`${input} font-mono`} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
           {t("newLoan", "pledgeWeight")}
           <input type="number" step="0.01" value={weight} onChange={(e) => setWeight(e.target.value)} className={`${input} font-mono`} />
         </label>
@@ -148,11 +151,11 @@ export function EditLoanForm({
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
           {t("newLoan", "issuedBy")}
-          <StaffSelect shopId={shopId} value={issuedBy} onChange={setIssuedBy} />
+          <input value={issuedBy} onChange={(e) => setIssuedBy(e.target.value)} placeholder={t("newLoan", "enterName")} className={input} />
         </label>
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
           {t("newLoan", "receivedBy")}
-          <StaffSelect shopId={shopId} value={receivedBy} onChange={setReceivedBy} />
+          <input value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder={t("newLoan", "enterName")} className={input} />
         </label>
       </div>
 

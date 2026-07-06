@@ -64,7 +64,9 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
         interest += p.interestPaise;
       }
     const rePledged = data.rePledgeDates.filter((d) => inRange(d)).length;
-    return { loansCount: loansInRange.length, loanAmount, closed, returned, interest, rePledged };
+    const active = data.loans.filter((l) => l.status === "active").length;
+    const totalInterest = data.payments.reduce((s, p) => s + p.interestPaise, 0);
+    return { loansCount: loansInRange.length, loanAmount, closed, returned, interest, rePledged, active, totalInterest };
   }, [loansInRange, data, start, end]);
 
   async function handleExport(kind: "pdf" | "excel") {
@@ -189,13 +191,15 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
       )}
 
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         <Stat label={t("reports", "loansCount")} value={String(summary.loansCount)} />
         <Stat label={t("reports", "loanAmount")} value={formatPaise(summary.loanAmount)} />
-        <Stat label={t("reports", "interestCollected")} value={formatPaise(summary.interest)} gold />
         <Stat label={t("reports", "returned")} value={formatPaise(summary.returned)} />
-        <Stat label={t("reports", "closedCount")} value={String(summary.closed)} />
         <Stat label={t("reports", "outstanding")} value={formatPaise(data.outstandingPaise)} />
+        <Stat label={t("reports", "interestCollected")} value={formatPaise(summary.interest)} gold />
+        <Stat label={t("reports", "totalInterest")} value={formatPaise(summary.totalInterest)} gold />
+        <Stat label={t("reports", "activeCount")} value={String(summary.active)} />
+        <Stat label={t("reports", "closedCount")} value={String(summary.closed)} />
       </div>
       <div className="text-sm text-ink-soft">
         {t("reports", "rePledged")}: <span className="font-mono text-wine">{summary.rePledged}</span> · {start} → {end}

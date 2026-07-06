@@ -9,7 +9,7 @@ import { formatPaise, rupeesToPaise, toDateInputValue } from "@/lib/money";
 import { currentInterestOwed, currentRate, toRateSegments } from "@/lib/loans";
 import { calculateInterestPaise, monthsForPeriod, interestForMonths } from "@/lib/interest";
 import { RePledgeSection, type RePledge, type RePledgeHistory } from "./RePledgeSection";
-import { EditLoanForm, type StaffLite, type LoanEdit } from "./EditLoanForm";
+import { EditLoanForm, type LoanEdit } from "./EditLoanForm";
 
 type RateSegment = {
   id: string;
@@ -38,6 +38,7 @@ export type LoanDetailData = {
   status: "active" | "closed";
   closed_date: string | null;
   item_type: "gold" | "silver" | null;
+  item_count: number | null;
   remarks: string | null;
   issued_by: string | null;
   received_by: string | null;
@@ -49,13 +50,11 @@ export type LoanDetailData = {
 
 export function LoanDetail({
   loan,
-  staff,
   shopId,
   editHistory,
   rePledgeHistory,
 }: {
   loan: LoanDetailData;
-  staff: StaffLite[];
   shopId: string;
   editHistory: LoanEdit[];
   rePledgeHistory: RePledgeHistory[];
@@ -65,6 +64,22 @@ export function LoanDetail({
   const supabase = useMemo(() => createClient(), []);
   const isActive = loan.status === "active";
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    if (!window.confirm(t("loanDetail", "deleteLoanConfirm"))) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const { error } = await supabase.from("loans").delete().eq("id", loan.id);
+    if (error) {
+      setDeleting(false);
+      setDeleteError(error.message);
+      return;
+    }
+    router.push("/loans/active");
+    router.refresh();
+  }
 
   const interestOwed = useMemo(
     () => currentInterestOwed(loan.principal_paise, loan.interest_rate_segments),
@@ -72,7 +87,6 @@ export function LoanDetail({
   );
   const rateNow = currentRate(loan.interest_rate_segments);
   const activeRePledge = loan.re_pledges.find((r) => r.status === "active") ?? null;
-  const staffName = (id: string | null) => (id ? (staff.find((s) => s.userId === id)?.name ?? "—") : "—");
 
   return (
     <div className="flex flex-col gap-6">
@@ -113,14 +127,21 @@ export function LoanDetail({
               >
                 {t("loanDetail", "printReceipt")}
               </Link>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-block rounded-lg border border-wine-soft px-3 py-1 text-sm text-wine-soft transition-colors hover:bg-wine-soft hover:text-onwine disabled:opacity-50"
+              >
+                {deleting ? t("common", "loading") : t("loanDetail", "deleteLoan")}
+              </button>
             </div>
+            {deleteError && <p className="mt-1 text-right text-xs text-wine-soft">{deleteError}</p>}
           </div>
         </div>
 
         {editing && (
           <div className="pt-5">
             <EditLoanForm
-              shopId={shopId}
               onCancel={() => setEditing(false)}
               loan={{
                 id: loan.id,
@@ -132,6 +153,7 @@ export function LoanDetail({
                 pledgeItem: loan.pledge_item_description,
                 pledgeWeightGrams: loan.pledge_weight_grams,
                 itemType: loan.item_type ?? "gold",
+                itemCount: loan.item_count ?? 1,
                 loanDate: loan.loan_date,
                 remarks: loan.remarks,
                 ratePercent: rateNow,
@@ -151,8 +173,9 @@ export function LoanDetail({
 
         <div className="grid grid-cols-2 gap-6 border-b border-gold-soft py-5 sm:grid-cols-4">
           <Field label={t("loanDetail", "itemTypeLabel")} value={t("newLoan", loan.item_type ?? "gold")} />
-          <Field label={t("loanDetail", "issuedByLabel")} value={staffName(loan.issued_by)} />
-          <Field label={t("loanDetail", "receivedByLabel")} value={staffName(loan.received_by)} />
+          <Field label={t("loanDetail", "itemCountLabel")} value={`${loan.item_count ?? 1} ${t("newLoan", "itemsUnit")}`} mono />
+          <Field label={t("loanDetail", "issuedByLabel")} value={loan.issued_by || "—"} />
+          <Field label={t("loanDetail", "receivedByLabel")} value={loan.received_by || "—"} />
         </div>
 
         <div className="py-5">

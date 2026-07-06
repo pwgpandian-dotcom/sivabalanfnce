@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { rupeesToPaise } from "@/lib/money";
 import { CustomerPicker, type PickerValue } from "./CustomerPicker";
-import { StaffSelect } from "../../StaffSelect";
 
 export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: number }) {
   const { t } = useLocale();
@@ -18,6 +17,7 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
   const [pledgeItem, setPledgeItem] = useState("");
   const [pledgeWeight, setPledgeWeight] = useState("");
   const [itemType, setItemType] = useState<"gold" | "silver">("gold");
+  const [itemCount, setItemCount] = useState("1");
   const [principal, setPrincipal] = useState("");
   const [assessedValue, setAssessedValue] = useState("");
   const [rate, setRate] = useState("");
@@ -74,8 +74,9 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
         p_is_migrated: true,
         p_item_type: itemType,
         p_remarks: remarks.trim() || null,
-        p_issued_by: issuedBy || null,
-        p_received_by: receivedBy || null,
+        p_issued_by: issuedBy.trim() || null,
+        p_received_by: receivedBy.trim() || null,
+        p_item_count: itemCount ? Math.max(1, parseInt(itemCount, 10) || 1) : 1,
       });
 
       if (rpcError) {
@@ -92,6 +93,7 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
       setPawnId("");
       setPledgeItem("");
       setPledgeWeight("");
+      setItemCount("1");
       setPrincipal("");
       setAssessedValue("");
       setRate("");
@@ -152,6 +154,13 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
 
       <div className="grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "itemCount")}
+          <input type="number" min={1} step={1} value={itemCount} onChange={(e) => setItemCount(e.target.value)} className={inputClass} />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
           {t("newLoan", "pledgeWeight")}
           <input type="number" step="0.01" value={pledgeWeight} onChange={(e) => setPledgeWeight(e.target.value)} className={inputClass} />
         </label>
@@ -172,11 +181,11 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
       <div className="grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
           {t("newLoan", "issuedBy")}
-          <StaffSelect shopId={shopId} value={issuedBy} onChange={setIssuedBy} />
+          <input value={issuedBy} onChange={(e) => setIssuedBy(e.target.value)} placeholder={t("newLoan", "enterName")} className={inputClass.replace("font-mono ", "")} />
         </label>
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
           {t("newLoan", "receivedBy")}
-          <StaffSelect shopId={shopId} value={receivedBy} onChange={setReceivedBy} />
+          <input value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder={t("newLoan", "enterName")} className={inputClass.replace("font-mono ", "")} />
         </label>
       </div>
 

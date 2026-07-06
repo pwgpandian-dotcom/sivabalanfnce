@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { rupeesToPaise } from "@/lib/money";
-import { StaffSelect } from "../../StaffSelect";
 
 type Customer = { id: string; name: string; phone: string | null };
 
@@ -32,6 +31,7 @@ export function NewLoanForm({
   const [pledgeItem, setPledgeItem] = useState("");
   const [pledgeWeight, setPledgeWeight] = useState("");
   const [itemType, setItemType] = useState<"gold" | "silver">("gold");
+  const [itemCount, setItemCount] = useState("1");
   const [principal, setPrincipal] = useState("");
   const [assessedValue, setAssessedValue] = useState("");
   const [rate, setRate] = useState("");
@@ -110,8 +110,9 @@ export function NewLoanForm({
         p_assessed_value_paise: assessedValue ? rupeesToPaise(parseFloat(assessedValue)) : null,
         p_item_type: itemType,
         p_remarks: remarks.trim() || null,
-        p_issued_by: issuedBy || null,
-        p_received_by: receivedBy || null,
+        p_issued_by: issuedBy.trim() || null,
+        p_received_by: receivedBy.trim() || null,
+        p_item_count: itemCount ? Math.max(1, parseInt(itemCount, 10) || 1) : 1,
       });
 
       if (rpcError) {
@@ -257,6 +258,17 @@ export function NewLoanForm({
             <option value="silver">{t("newLoan", "silver")}</option>
           </select>
         </label>
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
+          {t("newLoan", "itemCount")}
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={itemCount}
+            onChange={(e) => setItemCount(e.target.value)}
+            className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 font-mono text-ink outline-none focus:border-wine"
+          />
+        </label>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -317,11 +329,21 @@ export function NewLoanForm({
       <div className="grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
           {t("newLoan", "issuedBy")}
-          <StaffSelect shopId={shopId} value={issuedBy} onChange={setIssuedBy} />
+          <input
+            value={issuedBy}
+            onChange={(e) => setIssuedBy(e.target.value)}
+            placeholder={t("newLoan", "enterName")}
+            className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 text-ink outline-none focus:border-wine"
+          />
         </label>
         <label className="flex flex-col gap-1 text-sm text-ink-soft">
           {t("newLoan", "receivedBy")}
-          <StaffSelect shopId={shopId} value={receivedBy} onChange={setReceivedBy} />
+          <input
+            value={receivedBy}
+            onChange={(e) => setReceivedBy(e.target.value)}
+            placeholder={t("newLoan", "enterName")}
+            className="rounded-lg border border-gold-soft bg-ivory px-3 py-2 text-ink outline-none focus:border-wine"
+          />
         </label>
       </div>
 

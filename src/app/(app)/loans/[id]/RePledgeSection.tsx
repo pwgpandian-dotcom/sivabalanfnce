@@ -145,6 +145,17 @@ export function RePledgeSection({
     router.refresh();
   }
 
+  async function remove(rp: RePledge) {
+    if (!window.confirm(t("rePledge", "deleteConfirm"))) return;
+    const { error: rpcErr } = await supabase.rpc("delete_re_pledge", { p_id: rp.id });
+    if (rpcErr) {
+      setError(rpcErr.message);
+      return;
+    }
+    if (mode === "edit") setMode("none");
+    router.refresh();
+  }
+
   return (
     <div className="ledger-card rounded-2xl p-8">
       <div className="mb-3 flex items-center justify-between">
@@ -161,7 +172,13 @@ export function RePledgeSection({
 
       {/* Active re-pledge card */}
       {activeRP && mode !== "edit" && (
-        <RePledgeCard rp={activeRP} active onEdit={() => openEdit(activeRP)} onRedeem={() => redeem(activeRP)} />
+        <RePledgeCard
+          rp={activeRP}
+          active
+          onEdit={() => openEdit(activeRP)}
+          onRedeem={() => redeem(activeRP)}
+          onDelete={() => remove(activeRP)}
+        />
       )}
 
       {/* Past (redeemed) re-pledges */}
@@ -289,11 +306,13 @@ function RePledgeCard({
   active,
   onEdit,
   onRedeem,
+  onDelete,
 }: {
   rp: RePledge;
   active?: boolean;
   onEdit?: () => void;
   onRedeem?: () => void;
+  onDelete?: () => void;
 }) {
   const { t } = useLocale();
   return (
@@ -331,6 +350,9 @@ function RePledgeCard({
           </button>
           <button onClick={onRedeem} className="rounded-lg bg-wine px-3 py-1 text-xs font-medium text-onwine hover:bg-wine-deep">
             {t("rePledge", "redeem")}
+          </button>
+          <button onClick={onDelete} className="rounded-lg border border-wine-soft px-3 py-1 text-xs text-wine-soft transition-colors hover:bg-wine-soft hover:text-onwine">
+            {t("rePledge", "delete")}
           </button>
         </div>
       )}
