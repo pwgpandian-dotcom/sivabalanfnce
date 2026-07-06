@@ -37,7 +37,7 @@ export function WelcomeBanner({
       {/* Full image on the right — object-contain so the whole figure is visible. */}
       <div className="relative h-full w-40 shrink-0 sm:w-64">
         <Image
-          src="/branding/murugan-dashboard-v2.jpg"
+          src="/branding/murugan-dashboard-v3.jpg"
           alt="Lord Murugan"
           fill
           sizes="256px"
