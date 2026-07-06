@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
-import { rupeesToPaise } from "@/lib/money";
+import { rupeesToPaise, toDateInputValue } from "@/lib/money";
 import { CustomerPicker, type PickerValue } from "./CustomerPicker";
 
 export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: number }) {
@@ -21,7 +21,7 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
   const [principal, setPrincipal] = useState("");
   const [assessedValue, setAssessedValue] = useState("");
   const [rate, setRate] = useState("");
-  const [loanDate, setLoanDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [loanDate, setLoanDate] = useState(() => toDateInputValue());
   const [remarks, setRemarks] = useState("");
   const [issuedBy, setIssuedBy] = useState("");
   const [receivedBy, setReceivedBy] = useState("");

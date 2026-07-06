@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
-import { rupeesToPaise } from "@/lib/money";
+import { rupeesToPaise, toDateInputValue } from "@/lib/money";
 
 type Customer = { id: string; name: string; phone: string | null };
 
@@ -35,7 +35,7 @@ export function NewLoanForm({
   const [principal, setPrincipal] = useState("");
   const [assessedValue, setAssessedValue] = useState("");
   const [rate, setRate] = useState("");
-  const [loanDate, setLoanDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [loanDate, setLoanDate] = useState(() => toDateInputValue());
   const [remarks, setRemarks] = useState("");
   const [issuedBy, setIssuedBy] = useState("");
   const [receivedBy, setReceivedBy] = useState("");

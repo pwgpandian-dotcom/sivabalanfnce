@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise } from "@/lib/money";
 import type { ReportData, ReportLoan } from "@/lib/reports";
@@ -50,9 +50,9 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
     }
   }, [preset, customFrom, customTo]);
 
-  const inRange = (d: string | null) => Boolean(d) && d! >= start && d! <= end;
+  const inRange = useCallback((d: string | null) => Boolean(d) && d! >= start && d! <= end, [start, end]);
 
-  const loansInRange = useMemo(() => data.loans.filter((l) => inRange(l.loanDate)), [data.loans, start, end]);
+  const loansInRange = useMemo(() => data.loans.filter((l) => inRange(l.loanDate)), [data.loans, inRange]);
   const summary = useMemo(() => {
     const loanAmount = loansInRange.reduce((s, l) => s + l.principalPaise, 0);
     const closed = data.loans.filter((l) => inRange(l.closedDate)).length;
@@ -67,7 +67,7 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
     const active = data.loans.filter((l) => l.status === "active").length;
     const totalInterest = data.payments.reduce((s, p) => s + p.interestPaise, 0);
     return { loansCount: loansInRange.length, loanAmount, closed, returned, interest, rePledged, active, totalInterest };
-  }, [loansInRange, data, start, end]);
+  }, [loansInRange, data, inRange]);
 
   async function handleExport(kind: "pdf" | "excel") {
     setBusy(kind);

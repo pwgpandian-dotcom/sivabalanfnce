@@ -11,6 +11,9 @@ export type DashboardLoan = {
   customerName: string;
   principalPaise: number;
   daysElapsed: number;
+  // Days since the last interest payment (or the loan date if none). Drives the
+  // overdue flag — a loan is overdue when interest hasn't been paid for a while.
+  overdueDays: number;
   interestOwedPaise: number;
   rePledgeBroker?: string | null;
 };
@@ -41,7 +44,7 @@ export function DashboardTable({ loans, emptyLabel }: { loans: DashboardLoan[]; 
         </thead>
         <tbody>
           {loans.map((loan) => {
-            const overdue = loan.daysElapsed >= OVERDUE_THRESHOLD_DAYS;
+            const overdue = loan.overdueDays >= OVERDUE_THRESHOLD_DAYS;
             const rePledged = Boolean(loan.rePledgeBroker);
             return (
               <tr key={loan.id} className={`border-b border-gold-soft/60 last:border-0 ${overdue ? "bg-wine/5" : ""}`}>

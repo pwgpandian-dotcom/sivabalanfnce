@@ -1,4 +1,5 @@
 import { calculateInterestPaise, type RateSegment } from "@/lib/interest";
+import { toDateInputValue } from "@/lib/money";
 
 export type RateSegmentRow = {
   rate_percent: number;
@@ -20,8 +21,8 @@ export function toRateSegments(rows: RateSegmentRow[]): RateSegment[] {
 
 /** Instant client/server-side preview of interest owed as of today, mirroring calculate_interest() RPC. */
 export function currentInterestOwed(principalPaise: number, segments: RateSegmentRow[]): number {
-  const today = new Date();
-  const asOf = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  // "Today" in IST (parsed as UTC midnight), consistent with all stored dates.
+  const asOf = new Date(toDateInputValue() + "T00:00:00Z");
   return calculateInterestPaise(principalPaise, toRateSegments(segments), asOf);
 }
 
@@ -31,9 +32,8 @@ export function currentRate(segments: RateSegmentRow[]): number | null {
 }
 
 /**
- * Loans still open this many days or more after their pledge (loan) date are
- * flagged as significantly overdue on the dashboard and overdue list. This is
- * measured from the loan/pledge date (the redemption clock), not from the last
- * interest payment — matching the classic pawn maturity model.
+ * A loan is flagged as significantly overdue on the dashboard and overdue list
+ * when no interest has been paid for this many days — measured from the last
+ * interest payment, or from the loan date if no interest has ever been paid.
  */
 export const OVERDUE_THRESHOLD_DAYS = 90;

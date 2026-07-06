@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { daysSince } from "@/lib/money";
+import { daysSince, toDateInputValue } from "@/lib/money";
 import { OVERDUE_THRESHOLD_DAYS } from "@/lib/loans";
 import type { SummaryStats } from "@/app/(app)/SummaryCards";
 import type { ClosureBucket } from "@/app/(app)/ClosuresChart";
@@ -14,10 +14,10 @@ export async function loadSummaryStats(
   supabase: SupabaseClient,
   shopId: string
 ): Promise<SummaryStats> {
-  const [activeRes, closedCountRes, collectedRes, customerRes] = await Promise.all([
+  const [activeRes, closedCountRes, collectedRes, customerRes, interestPayRes] = await Promise.all([
     supabase
       .from("loans")
-      .select("principal_paise, loan_date")
+      .select("id, principal_paise, loan_date")
       .eq("shop_id", shopId)
       .eq("status", "active"),
     supabase
@@ -35,12 +35,27 @@ export async function loadSummaryStats(
       .from("customers")
       .select("id", { count: "exact", head: true })
       .eq("shop_id", shopId),
+    // Interest payments on ACTIVE loans, for the "no interest paid in N days" overdue rule.
+    supabase
+      .from("payments")
+      .select("loan_id, payment_date, loans!inner(shop_id, status)")
+      .eq("loans.shop_id", shopId)
+      .eq("loans.status", "active")
+      .eq("payment_type", "interest"),
   ]);
 
   if (activeRes.error) throw new Error(activeRes.error.message);
   if (closedCountRes.error) throw new Error(closedCountRes.error.message);
   if (collectedRes.error) throw new Error(collectedRes.error.message);
   if (customerRes.error) throw new Error(customerRes.error.message);
+  if (interestPayRes.error) throw new Error(interestPayRes.error.message);
+
+  // Most recent interest payment per active loan.
+  const lastInterestByLoan = new Map<string, string>();
+  for (const p of interestPayRes.data ?? []) {
+    const prev = lastInterestByLoan.get(p.loan_id);
+    if (!prev || p.payment_date > prev) lastInterestByLoan.set(p.loan_id, p.payment_date);
+  }
 
   const activeLoans = activeRes.data ?? [];
   let activePrincipalPaise = 0;
@@ -49,7 +64,8 @@ export async function loadSummaryStats(
 
   for (const loan of activeLoans) {
     activePrincipalPaise += loan.principal_paise;
-    if (daysSince(loan.loan_date) >= OVERDUE_THRESHOLD_DAYS) {
+    const lastInterest = lastInterestByLoan.get(loan.id) ?? loan.loan_date;
+    if (daysSince(lastInterest) >= OVERDUE_THRESHOLD_DAYS) {
       overdueCount += 1;
       overduePrincipalPaise += loan.principal_paise;
     }
@@ -136,7 +152,7 @@ function paymentInterestPaise(p: {
 
 /** Daily amounts + interest-income figures for the dashboard. */
 export async function loadInterestStats(supabase: SupabaseClient, shopId: string): Promise<InterestStats> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDateInputValue();
   const month = today.slice(0, 7);
 
   const [loansRes, paymentsRes] = await Promise.all([
@@ -185,7 +201,7 @@ export type RePledgeStats = {
 
 /** Re-pledge dashboard figures for a shop (tolerant if the tables aren't there). */
 export async function loadRePledgeStats(supabase: SupabaseClient, shopId: string): Promise<RePledgeStats> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDateInputValue();
   const { data, error } = await supabase
     .from("re_pledges")
     .select("amount_received_paise, pledge_date, status, redeemed_date, loans!inner(shop_id)")

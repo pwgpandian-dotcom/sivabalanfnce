@@ -11,13 +11,21 @@ export function rupeesToPaise(rupees: number): number {
   return Math.round(rupees * 100);
 }
 
-export function daysSince(date: string): number {
-  const start = new Date(date + "T00:00:00Z");
-  const now = new Date();
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  return Math.round((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+// This app serves a single Indian pawn shop, so every date is Indian Standard
+// Time (UTC+5:30, no DST). The server runs in UTC, so we derive the IST calendar
+// date explicitly instead of relying on the host timezone — otherwise, between
+// 00:00 and 05:30 IST, "today" would resolve to the previous UTC day.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** The IST calendar date ("YYYY-MM-DD") for the given instant (defaults to now). */
+export function toDateInputValue(date: Date = new Date()): string {
+  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-export function toDateInputValue(date: Date): string {
-  return date.toISOString().slice(0, 10);
+/** Whole days elapsed from an IST date string (YYYY-MM-DD) until today in IST. */
+export function daysSince(date: string): number {
+  const start = Date.parse(date + "T00:00:00Z");
+  const today = Date.parse(toDateInputValue() + "T00:00:00Z");
+  return Math.round((today - start) / MS_PER_DAY);
 }

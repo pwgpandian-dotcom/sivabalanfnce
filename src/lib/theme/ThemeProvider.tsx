@@ -29,7 +29,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setThemeState(stored);
     } else if (document.documentElement.classList.contains("dark")) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setThemeState("dark");
     }
   }, []);

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
-import { formatPaise } from "@/lib/money";
+import { formatPaise, toDateInputValue } from "@/lib/money";
 import type { RePledgeRow, CandidateRow } from "@/lib/rePledges";
 import { exportRePledgesPdf, exportRePledgesExcel } from "./rePledgeExport";
 
@@ -76,7 +76,7 @@ export function RePledgesScreen({
   // stamps updated_by/updated_at — matching the loan-detail redeem path.
   async function markRedeemed(id: string) {
     if (!window.confirm(t("rePledge", "redeemConfirm"))) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toDateInputValue();
     const { error: rpcErr } = await supabase.rpc("redeem_re_pledge", { p_id: id, p_redeemed_date: today });
     if (rpcErr) {
       setError(rpcErr.message);

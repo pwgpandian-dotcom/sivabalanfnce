@@ -29,27 +29,46 @@ export async function loadActiveDashboardLoans(
   // Map of loan_id -> active re-pledge broker, so the list can flag re-pledged
   // items. Fetched tolerantly (empty if migration 0005 isn't applied yet).
   const rePledgeByLoan = new Map<string, string>();
+  // Map of loan_id -> most recent interest payment date, for the overdue flag.
+  const lastInterestByLoan = new Map<string, string>();
   const loanIds = loans.map((l) => l.id);
   if (loanIds.length > 0) {
-    const { data: rp } = await supabase
-      .from("re_pledges")
-      .select("loan_id, larger_broker_name, status")
-      .in("loan_id", loanIds)
-      .eq("status", "active");
-    for (const row of rp ?? []) {
+    const [rpRes, payRes] = await Promise.all([
+      supabase
+        .from("re_pledges")
+        .select("loan_id, larger_broker_name, status")
+        .in("loan_id", loanIds)
+        .eq("status", "active"),
+      supabase
+        .from("payments")
+        .select("loan_id, payment_date")
+        .in("loan_id", loanIds)
+        .eq("payment_type", "interest"),
+    ]);
+    for (const row of rpRes.data ?? []) {
       if (!rePledgeByLoan.has(row.loan_id)) rePledgeByLoan.set(row.loan_id, row.larger_broker_name);
+    }
+    for (const p of payRes.data ?? []) {
+      const prev = lastInterestByLoan.get(p.loan_id);
+      if (!prev || p.payment_date > prev) lastInterestByLoan.set(p.loan_id, p.payment_date);
     }
   }
 
-  return loans.map((loan) => ({
-    id: loan.id,
-    loanNumber: loan.loan_number,
-    customerName: (loan.customers as unknown as { name: string } | null)?.name ?? "",
-    principalPaise: loan.principal_paise,
-    daysElapsed: daysSince(loan.loan_date),
-    interestOwedPaise: currentInterestOwed(loan.principal_paise, loan.interest_rate_segments ?? []),
-    rePledgeBroker: rePledgeByLoan.get(loan.id) ?? null,
-  }));
+  return loans.map((loan) => {
+    // Overdue is measured from the last interest payment (or the loan date if
+    // none) — a loan is overdue when interest hasn't been paid for a while.
+    const lastInterest = lastInterestByLoan.get(loan.id) ?? loan.loan_date;
+    return {
+      id: loan.id,
+      loanNumber: loan.loan_number,
+      customerName: (loan.customers as unknown as { name: string } | null)?.name ?? "",
+      principalPaise: loan.principal_paise,
+      daysElapsed: daysSince(loan.loan_date),
+      overdueDays: daysSince(lastInterest),
+      interestOwedPaise: currentInterestOwed(loan.principal_paise, loan.interest_rate_segments ?? []),
+      rePledgeBroker: rePledgeByLoan.get(loan.id) ?? null,
+    };
+  });
 }
 
 /** Closed loans for a shop, newest closure first, with total collected per loan. */
