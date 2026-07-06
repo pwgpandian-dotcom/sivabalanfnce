@@ -35,7 +35,7 @@ export function LoginForm({ errorMessage }: { errorMessage?: string }) {
             />
           </label>
 
-          {errorMessage && <p className="text-sm text-wine-soft">{t("login", "error")}</p>}
+          {errorMessage && <p className="text-sm text-wine-soft">{errorMessage}</p>}
 
           <button
             type="submit"
