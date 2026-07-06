@@ -82,48 +82,95 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
       };
       const rows = loansInRange;
       const title = `${t("reports", "reportTitle")} · ${start} → ${end}`;
+
+      // Single source of truth for the summary — used identically by PDF and Excel.
+      const summaryRows: [string, string][] = [
+        [t("reports", "loansCount"), String(summary.loansCount)],
+        [t("reports", "loanAmount"), formatPaise(summary.loanAmount)],
+        [t("reports", "interestCollected"), formatPaise(summary.interest)],
+        [t("reports", "totalInterest"), formatPaise(summary.totalInterest)],
+        [t("reports", "returned"), formatPaise(summary.returned)],
+        [t("reports", "outstanding"), formatPaise(data.outstandingPaise)],
+        [t("reports", "activeCount"), String(summary.active)],
+        [t("reports", "closedCount"), String(summary.closed)],
+        [t("reports", "rePledged"), String(summary.rePledged)],
+      ];
+      const detailHead = [cols.loan, cols.customer, cols.item, cols.date, cols.amount, cols.status];
+      const detailBody = rows.map((r: ReportLoan) => [
+        r.loanNumber,
+        r.customerName,
+        r.itemType ?? "—",
+        r.loanDate,
+        formatPaise(r.principalPaise),
+        r.status,
+      ]);
+      const WINE: [number, number, number] = [94, 18, 36];
+      const IVORY: [number, number, number] = [250, 246, 236];
+
       if (kind === "pdf") {
         const { jsPDF } = await import("jspdf");
         const autoTable = (await import("jspdf-autotable")).default;
         const doc = new jsPDF();
         doc.setFontSize(14);
-        doc.setTextColor(94, 18, 36);
+        doc.setTextColor(...WINE);
         doc.text(`${shopName} — ${title}`, 14, 16);
-        doc.setFontSize(10);
-        doc.setTextColor(90, 74, 61);
-        doc.text(
-          `${t("reports", "loansCount")}: ${summary.loansCount}   ${t("reports", "loanAmount")}: ${formatPaise(summary.loanAmount)}   ${t("reports", "interestCollected")}: ${formatPaise(summary.interest)}   ${t("reports", "closedCount")}: ${summary.closed}`,
-          14,
-          23
-        );
+
+        // Summary block.
         autoTable(doc, {
-          startY: 28,
-          head: [[cols.loan, cols.customer, cols.item, cols.date, cols.amount, cols.status]],
-          body: rows.map((r: ReportLoan) => [r.loanNumber, r.customerName, r.itemType ?? "—", r.loanDate, formatPaise(r.principalPaise), r.status]),
+          startY: 24,
+          head: [[t("reports", "summaryHeading"), ""]],
+          body: summaryRows,
+          theme: "grid",
+          tableWidth: 96,
           styles: { fontSize: 9, cellPadding: 2 },
-          headStyles: { fillColor: [94, 18, 36], textColor: [250, 246, 236] },
+          headStyles: { fillColor: WINE, textColor: IVORY },
+          columnStyles: { 0: { fontStyle: "bold", textColor: [90, 74, 61] }, 1: { halign: "right" } },
+        });
+        const afterSummary = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+
+        // Detail table.
+        autoTable(doc, {
+          startY: afterSummary,
+          head: [detailHead],
+          body: detailBody,
+          styles: { fontSize: 9, cellPadding: 2 },
+          headStyles: { fillColor: WINE, textColor: IVORY },
         });
         doc.save(`sivabalan-report-${start}_${end}.pdf`);
       } else {
         const ExcelJS = (await import("exceljs")).default;
         const wb = new ExcelJS.Workbook();
         const ws = wb.addWorksheet("Report");
-        ws.columns = [
-          { header: cols.loan, key: "loan", width: 12 },
-          { header: cols.customer, key: "customer", width: 20 },
-          { header: cols.item, key: "item", width: 10 },
-          { header: cols.date, key: "date", width: 14 },
-          { header: cols.amount, key: "amount", width: 16 },
-          { header: cols.status, key: "status", width: 12 },
-        ];
-        ws.getRow(1).eachCell((c) => {
-          c.font = { bold: true, color: { argb: "FFFAF6EC" } };
-          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF5E1224" } };
-        });
-        for (const r of rows) {
-          const row = ws.addRow({ loan: r.loanNumber, customer: r.customerName, item: r.itemType ?? "", date: r.loanDate, amount: r.principalPaise / 100, status: r.status });
-          row.getCell("amount").numFmt = '"₹"#,##0.00';
+        const wineArgb = "FF5E1224";
+        const ivoryArgb = "FFFAF6EC";
+        const fillHeader = (row: import("exceljs").Row) =>
+          row.eachCell((c) => {
+            c.font = { bold: true, color: { argb: ivoryArgb } };
+            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: wineArgb } };
+          });
+
+        // Title.
+        const titleRow = ws.addRow([`${shopName} — ${title}`]);
+        titleRow.getCell(1).font = { bold: true, size: 12, color: { argb: wineArgb } };
+
+        // Summary block (identical to the PDF).
+        fillHeader(ws.addRow([t("reports", "summaryHeading"), ""]));
+        for (const [label, value] of summaryRows) {
+          const r = ws.addRow([label, value]);
+          r.getCell(1).font = { bold: true };
         }
+        ws.addRow([]); // spacer
+
+        // Detail table.
+        fillHeader(ws.addRow(detailHead));
+        for (const r of rows) {
+          const row = ws.addRow([r.loanNumber, r.customerName, r.itemType ?? "", r.loanDate, r.principalPaise / 100, r.status]);
+          row.getCell(5).numFmt = '"₹"#,##0.00';
+        }
+
+        // Column widths.
+        [16, 22, 12, 14, 16, 12].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+
         const buf = await wb.xlsx.writeBuffer();
         const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         const url = URL.createObjectURL(blob);

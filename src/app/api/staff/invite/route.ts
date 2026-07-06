@@ -67,19 +67,26 @@ export async function POST(request: Request) {
   const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email);
 
   if (inviteError) {
-    // Most likely "already registered" — look the user up and link them instead.
-    const { data: list, error: listError } = await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-    if (listError) {
+    // Most likely "already registered" — page through the auth users (no fixed
+    // cap; stop at the first match or the last page) and link them instead.
+    const perPage = 1000;
+    let existingId: string | null = null;
+    for (let page = 1; page <= 1000; page++) {
+      const { data: list, error: listError } = await admin.auth.admin.listUsers({ page, perPage });
+      if (listError) {
+        return NextResponse.json({ error: inviteError.message }, { status: 502 });
+      }
+      const match = list.users.find((u) => (u.email ?? "").toLowerCase() === email);
+      if (match) {
+        existingId = match.id;
+        break;
+      }
+      if (list.users.length < perPage) break; // reached the last page
+    }
+    if (!existingId) {
       return NextResponse.json({ error: inviteError.message }, { status: 502 });
     }
-    const existing = list.users.find((u) => (u.email ?? "").toLowerCase() === email);
-    if (!existing) {
-      return NextResponse.json({ error: inviteError.message }, { status: 502 });
-    }
-    invitedUserId = existing.id;
+    invitedUserId = existingId;
   } else {
     invitedUserId = inviteData.user?.id ?? null;
   }

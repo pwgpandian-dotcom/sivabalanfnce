@@ -199,13 +199,6 @@ export function OldLoanForm({ shopId, endingId }: { shopId: string; endingId: nu
         />
       </label>
 
-      {/* Receipt photo — flagged, needs a Storage bucket before wiring the upload. */}
-      <div className="flex flex-col gap-1">
-        <label className="text-sm text-ink-soft">{t("oldLoan", "photo")}</label>
-        <input type="file" accept="image/*" disabled className="text-sm text-ink-soft file:mr-3 file:rounded-lg file:border file:border-gold-soft file:bg-ivory-deep file:px-3 file:py-1 file:text-ink-soft disabled:opacity-60" />
-        <span className="text-[10px] text-wine-soft">{t("oldLoan", "photoNeedsSetup")}</span>
-      </div>
-
       {error && <p className="text-sm text-wine-soft">{error}</p>}
 
       <button
