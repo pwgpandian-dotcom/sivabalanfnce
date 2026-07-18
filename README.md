@@ -18,6 +18,22 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Database Migrations
+
+SQL migrations live in `supabase/migrations/` and are applied **by hand in the
+Supabase Dashboard → SQL Editor**, in filename order. They are idempotent
+(`create or replace` / `create ... if not exists`), so re-running an
+already-applied migration is safe. See `supabase/APPLY_MIGRATIONS.md` for the
+full list and details.
+
+- **`0012_full_month_calendar.sql`** — Full Month interest is charged by
+  **calendar months elapsed from the loan date, rounding any partial month up to
+  a whole month** (an exact monthly anniversary stays whole). Example:
+  May 1 → Jun 1 = 1 month, May 1 → Jun 2 = 2, May 1 → Jul 7 = 3. This keeps the
+  server-side `calculate_interest` in step with the client (`src/lib/interest.ts`)
+  so the "Interest Due" figures, the closing settlement, and the receipt all
+  agree. Apply it after `0011`.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

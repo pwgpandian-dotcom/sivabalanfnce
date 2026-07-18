@@ -14,6 +14,7 @@ project is currently only up to `0006`. Apply everything from `0007` onward:
 | 0009 | `migrations/0009_interest_roundup.sql` | (superseded by 0011's mode-aware version, but keep the order) |
 | 0010 | `migrations/0010_phase4_text_issuer_item_count_logo.sql` | item_count, free-text issuer/receiver, shop logo, delete_re_pledge |
 | 0011 | `migrations/0011_fixes_enhancements.sql` | **loan-number reuse, interest modes, first-month interest, customer fields** |
+| 0012 | `migrations/0012_full_month_calendar.sql` | **Full Month = calendar months from the loan date, partial month rounds up** (matches `src/lib/interest.ts`) |
 
 ## After applying
 
