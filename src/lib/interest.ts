@@ -5,7 +5,8 @@
  *
  * Interest is charged in "month units". How a partial month rounds depends on
  * the loan's interest mode (see InterestMode below). The shop's default is
- * "full_month" — a partial month is NOT rounded up to a whole extra month.
+ * "full_month" — whole calendar months elapsed, with ANY leftover days counting
+ * as one more full month (an exact monthly anniversary stays whole).
  */
 
 export type InterestMode = "full_month" | "half_month" | "exact_days";
@@ -27,11 +28,37 @@ function daysBetween(start: Date, end: Date): number {
   return Math.round((end.getTime() - start.getTime()) / MS_PER_DAY);
 }
 
+/** start + n calendar months (UTC), clamping the day to the target month's length. */
+function addMonthsUTC(date: Date, n: number): Date {
+  const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + n, 1));
+  const daysInTarget = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+  target.setUTCDate(Math.min(date.getUTCDate(), daysInTarget));
+  return target;
+}
+
+/**
+ * Whole calendar months elapsed from start to end, rounding ANY partial month up
+ * to a full month. An exact monthly anniversary stays whole (no round-up).
+ *   May 1 → Jun 1 = 1,  May 1 → Jun 2 = 2,  May 1 → Jul 7 = 3.
+ */
+function calendarMonthsRoundUp(start: Date, end: Date): number {
+  let completed = 0;
+  while (addMonthsUTC(start, completed + 1).getTime() <= end.getTime()) {
+    completed += 1;
+  }
+  const landsOnAnniversary = addMonthsUTC(start, completed).getTime() === end.getTime();
+  return landsOnAnniversary ? completed : completed + 1;
+}
+
 /**
  * Month units charged for a period, according to the interest mode:
- *   - full_month:  completed whole months only, minimum 1. 35d → 1, 65d → 2.
- *   - half_month:  completed months + (extra days ≤15 → +0.5, else +1), min 1.
- *                  35d → 1.5, 46d → 2, 12d → 1.
+ *   - full_month:  whole calendar months elapsed, any leftover days → +1 whole
+ *                  month; an exact anniversary stays whole. Minimum 1.
+ *                  May 1 → Jul 7 = 3, May 1 → Jun 1 = 1.
+ *   - half_month:  completed 30-day months + (extra days ≤15 → +0.5, else +1),
+ *                  min 1. 35d → 1.5, 46d → 2, 12d → 1.
  *   - exact_days:  precise day proration, days / 30 (no rounding, no minimum).
  *                  35d → 1.1666…, 15d → 0.5.
  */
@@ -47,20 +74,19 @@ export function monthsForPeriod(
     );
   }
 
-  const fullMonths = Math.floor(totalDays / 30);
-  const extraDays = totalDays - fullMonths * 30;
-
   switch (mode) {
     case "exact_days":
       return totalDays / 30;
     case "half_month": {
+      const fullMonths = Math.floor(totalDays / 30);
+      const extraDays = totalDays - fullMonths * 30;
       let units = fullMonths;
       if (extraDays > 0) units += extraDays <= 15 ? 0.5 : 1;
       return Math.max(1, units);
     }
     case "full_month":
     default:
-      return Math.max(1, fullMonths);
+      return Math.max(1, calendarMonthsRoundUp(startDate, endDate));
   }
 }
 

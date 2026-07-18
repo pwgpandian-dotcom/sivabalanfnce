@@ -13,10 +13,12 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
     .from("loans")
     .select(
       `loan_number, principal_paise, pledge_item_description, pledge_weight_grams,
-       loan_date, assessed_value_paise, issued_by,
+       loan_date, assessed_value_paise, issued_by, status, closed_date,
+       first_month_interest_deducted, first_month_interest_paise,
        customers(name, address, phone),
        shops(name, owner_name, address, phone),
-       interest_rate_segments(rate_percent, effective_to)`
+       interest_rate_segments(rate_percent, effective_to),
+       payments(amount_paise, payment_type, payment_date)`
     )
     .eq("id", id)
     .eq("shop_id", session.shopId)
@@ -33,14 +35,21 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
     loan_date: string;
     assessed_value_paise: number | null;
     issued_by: string | null;
+    status: "active" | "closed";
+    closed_date: string | null;
+    first_month_interest_deducted: boolean | null;
+    first_month_interest_paise: number | null;
     customers: { name: string; address: string | null; phone: string | null } | null;
     shops: { name: string; owner_name: string | null; address: string | null; phone: string | null } | null;
     interest_rate_segments: { rate_percent: number; effective_to: string | null }[];
+    payments: { amount_paise: number; payment_type: string; payment_date: string }[];
   };
 
   const openSeg =
     loan.interest_rate_segments.find((s) => s.effective_to === null) ??
     loan.interest_rate_segments[loan.interest_rate_segments.length - 1];
+
+  const closingPayment = loan.payments.find((p) => p.payment_type === "full_closing") ?? null;
 
   const receipt: ReceiptData = {
     loanNumber: loan.loan_number,
@@ -58,6 +67,10 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
     shopPhone: loan.shops?.phone ?? null,
     ratePercent: openSeg?.rate_percent ?? null,
     issuedBy: loan.issued_by ?? null,
+    firstMonthInterestDeducted: loan.first_month_interest_deducted ?? false,
+    firstMonthInterestPaise: loan.first_month_interest_paise ?? 0,
+    closingPaymentPaise: closingPayment?.amount_paise ?? null,
+    closedDate: loan.closed_date,
   };
 
   return (

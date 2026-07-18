@@ -10,21 +10,27 @@ import { computeLoan } from "../loanCalc";
 
 const d = (y: number, m: number, day: number) => new Date(Date.UTC(y, m - 1, day));
 
-describe("monthsForPeriod — full_month (default: floor, min 1)", () => {
+describe("monthsForPeriod — full_month (calendar months, partial rounds up, min 1)", () => {
   it("charges a minimum of 1 month for a zero-day period", () => {
     expect(monthsForPeriod(d(2023, 1, 1), d(2023, 1, 1))).toBe(1);
   });
-  it("30 days => 1 month", () => {
+  it("a partial first month still charges 1 month", () => {
     expect(monthsForPeriod(d(2023, 1, 1), d(2023, 1, 31))).toBe(1);
   });
-  it("35 days => 1 month (no extra month added)", () => {
-    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 2, 5))).toBe(1); // 35 days
+  it("exact monthly anniversary stays whole (May 1 → Jun 1 = 1)", () => {
+    expect(monthsForPeriod(d(2023, 5, 1), d(2023, 6, 1))).toBe(1);
   });
-  it("60 days => 2 months", () => {
-    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 3, 2))).toBe(2);
+  it("one day past the anniversary rounds up (May 1 → Jun 2 = 2)", () => {
+    expect(monthsForPeriod(d(2023, 5, 1), d(2023, 6, 2))).toBe(2);
   });
-  it("70 days => 2 months (floor, not 3)", () => {
-    expect(monthsForPeriod(d(2023, 1, 1), d(2023, 3, 12))).toBe(2);
+  it("May 1 → Jul 7 = 3 months (2 whole + partial)", () => {
+    expect(monthsForPeriod(d(2023, 5, 1), d(2023, 7, 7))).toBe(3);
+  });
+  it("May 1 → Jul 1 = 2 months (exact two-month anniversary)", () => {
+    expect(monthsForPeriod(d(2023, 5, 1), d(2023, 7, 1))).toBe(2);
+  });
+  it("respects the loan-date day-of-month (May 15 → Jul 7 = 2)", () => {
+    expect(monthsForPeriod(d(2023, 5, 15), d(2023, 7, 7))).toBe(2);
   });
 });
 
@@ -50,8 +56,8 @@ describe("monthsForPeriod — exact_days (days / 30)", () => {
 });
 
 describe("computePeriodInterestPaise", () => {
-  it("full_month: 35 days => 1 month", () => {
-    expect(computePeriodInterestPaise(100_000, 10, d(2023, 1, 1), d(2023, 2, 5))).toBe(10_000);
+  it("full_month: Jan 1 → Feb 5 => 2 months (1 whole + partial)", () => {
+    expect(computePeriodInterestPaise(100_000, 10, d(2023, 1, 1), d(2023, 2, 5))).toBe(20_000);
   });
   it("half_month: 35 days => 1.5 months", () => {
     expect(computePeriodInterestPaise(100_000, 10, d(2023, 1, 1), d(2023, 2, 5), "half_month")).toBe(15_000);
@@ -77,9 +83,9 @@ describe("calculateInterestPaise", () => {
       { ratePercent: 12, effectiveFrom: d(2023, 1, 1), effectiveTo: d(2023, 2, 28) },
       { ratePercent: 15, effectiveFrom: d(2023, 3, 1), effectiveTo: null },
     ];
-    // Segment 1: 58 days -> floor = 1 month -> 700000*0.12*1 = 84000
-    // Segment 2: 19 days -> min 1 month     -> 700000*0.15*1 = 105000
-    expect(calculateInterestPaise(principalPaise, segments, d(2023, 3, 20))).toBe(189_000);
+    // Segment 1: Jan 1 → Feb 28 -> 1 whole month + partial = 2 -> 700000*0.12*2 = 168000
+    // Segment 2: Mar 1 → Mar 20 -> partial, min 1 month        -> 700000*0.15*1 = 105000
+    expect(calculateInterestPaise(principalPaise, segments, d(2023, 3, 20))).toBe(273_000);
   });
 
   it("ignores segments that start after asOfDate", () => {

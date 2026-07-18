@@ -182,7 +182,7 @@ export function CustomerDetail({ customer }: { customer: CustomerWithLoans }) {
               <thead>
                 <tr className="border-b border-gold-soft text-left text-xs uppercase tracking-wide text-ink-soft">
                   <th className="px-3 py-2 font-medium">{t("dashboard", "loanNumber")}</th>
-                  <th className="px-3 py-2 text-right font-medium">{t("dashboard", "principal")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{t("loanDetail", "principalAmount")}</th>
                   <th className="px-3 py-2 font-medium">{t("loanList", "loanDate")}</th>
                   <th className="px-3 py-2 font-medium">{t("customers", "status")}</th>
                   <th className="px-3 py-2 text-right font-medium">{t("actions", "title")}</th>

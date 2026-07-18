@@ -73,7 +73,7 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
     setBusy(kind);
     try {
       const cols = {
-        loan: t("reports", "month"),
+        loan: t("reports", "loanNo"),
         customer: t("reports", "customer"),
         item: t("reports", "itemType"),
         date: t("reports", "date"),
@@ -261,7 +261,7 @@ export function ReportsView({ data, shopName }: { data: ReportData; shopName: st
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-gold-soft bg-ivory-deep text-left text-xs uppercase tracking-wide text-ink-soft">
-              <th className="px-4 py-2 font-medium">{t("reports", "month")}</th>
+              <th className="px-4 py-2 font-medium">{t("reports", "loanNo")}</th>
               <th className="px-4 py-2 font-medium">{t("reports", "customer")}</th>
               <th className="px-4 py-2 font-medium">{t("reports", "itemType")}</th>
               <th className="px-4 py-2 font-medium">{t("reports", "date")}</th>

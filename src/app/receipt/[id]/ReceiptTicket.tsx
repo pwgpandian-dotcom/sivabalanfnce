@@ -21,6 +21,10 @@ export type ReceiptData = {
   shopPhone: string | null;
   ratePercent: number | null;
   issuedBy: string | null;
+  firstMonthInterestDeducted: boolean;
+  firstMonthInterestPaise: number;
+  closingPaymentPaise: number | null;
+  closedDate: string | null;
 };
 
 function rupees(paise: number): string {
@@ -28,6 +32,18 @@ function rupees(paise: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function SummaryRow({ ta, en, value, bold }: { ta: string; en: string; value: string; bold?: boolean }) {
+  return (
+    <tr className={`border border-black align-top ${bold ? "font-bold" : ""}`}>
+      <td className="border border-black px-2 py-1.5" lang="ta">
+        <span className={tamilSerif.className}>{ta}</span>
+        <span className="ml-1 text-[10px] uppercase tracking-wide text-gray-600">{en}</span>
+      </td>
+      <td className="w-40 border border-black px-2 py-1.5 text-right">{value}</td>
+    </tr>
+  );
 }
 
 export function ReceiptTicket({ data }: { data: ReceiptData }) {
@@ -117,6 +133,42 @@ export function ReceiptTicket({ data }: { data: ReceiptData }) {
           ))}
         </tbody>
       </table>
+
+      {/* Disbursement / closing summary — clarifies loan amount, deducted
+          interest, cash actually handed over, and (if closed) closing payment. */}
+      {(data.firstMonthInterestDeducted || data.closingPaymentPaise != null) && (
+        <table className="mt-4 w-full border-collapse text-sm">
+          <caption className="border border-b-0 border-black bg-gray-100 px-2 py-1 text-left text-xs font-bold uppercase tracking-wide">
+            <span className={tamilSerif.className} lang="ta">வழங்கிய தொகை விவரம்</span> / Disbursement Summary
+          </caption>
+          <tbody>
+            <SummaryRow ta="கடன் தொகை" en="Principal Amount" value={`Rs. ${rupees(data.principalPaise)}`} />
+            {data.firstMonthInterestDeducted && (
+              <>
+                <SummaryRow
+                  ta="முதல் மாத வட்டி கழிவு"
+                  en="First Month Interest Deducted"
+                  value={`− Rs. ${rupees(data.firstMonthInterestPaise)}`}
+                />
+                <SummaryRow
+                  ta="வாடிக்கையாளருக்கு வழங்கிய பணம்"
+                  en="Cash Disbursed to Customer"
+                  value={`Rs. ${rupees(data.principalPaise - data.firstMonthInterestPaise)}`}
+                  bold
+                />
+              </>
+            )}
+            {data.closingPaymentPaise != null && (
+              <SummaryRow
+                ta="முடிப்பு கட்டணம்"
+                en={`Closing Payment${data.closedDate ? ` (${data.closedDate})` : ""}`}
+                value={`Rs. ${rupees(data.closingPaymentPaise)}`}
+                bold
+              />
+            )}
+          </tbody>
+        </table>
+      )}
 
       {/* Footer signature — prints the issuer's name entered while creating the loan. */}
       <div className="mt-4 flex items-end justify-end">

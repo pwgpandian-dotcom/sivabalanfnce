@@ -6,8 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { formatPaise, rupeesToPaise, toDateInputValue } from "@/lib/money";
-import { currentInterestOwed, currentRate, toRateSegments } from "@/lib/loans";
-import { calculateInterestPaise, monthsForPeriod, interestForMonths, type InterestMode } from "@/lib/interest";
+import { currentInterestOwed, currentRate } from "@/lib/loans";
+import { monthsForPeriod, interestForMonths, type InterestMode } from "@/lib/interest";
 import { RePledgeSection, type RePledge, type RePledgeHistory } from "./RePledgeSection";
 import { EditLoanForm, type LoanEdit } from "./EditLoanForm";
 
@@ -173,7 +173,7 @@ export function LoanDetail({
 
         <div className="grid grid-cols-2 gap-6 border-b border-gold-soft py-5 sm:grid-cols-4">
           <Field label={t("loanDetail", "loanDate")} value={loan.loan_date} mono />
-          <Field label={t("newLoan", "principal")} value={formatPaise(loan.principal_paise)} mono />
+          <Field label={t("loanDetail", "principalAmount")} value={formatPaise(loan.principal_paise)} mono />
           <Field label={t("loanDetail", "currentRate")} value={rateNow !== null ? `${rateNow}%` : "—"} mono />
           <Field label={t("dashboard", "interestDue")} value={formatPaise(interestOwed)} mono highlight />
         </div>
@@ -187,9 +187,24 @@ export function LoanDetail({
         </div>
 
         {loan.first_month_interest_deducted && (
-          <div className="border-b border-gold-soft py-3 text-sm text-ink-soft">
-            <span className="font-medium text-wine">{t("loanDetail", "firstMonthDeductedLabel")}</span>
-            {loan.first_month_interest_paise ? ` — ${formatPaise(loan.first_month_interest_paise)}` : ""}
+          <div className="border-b border-gold-soft py-5">
+            <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
+              {t("loanDetail", "disbursementTitle")}
+            </h2>
+            <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
+              <Field label={t("loanDetail", "principalAmount")} value={formatPaise(loan.principal_paise)} mono />
+              <Field
+                label={t("loanDetail", "firstMonthDeductedLabel")}
+                value={`− ${formatPaise(loan.first_month_interest_paise ?? 0)}`}
+                mono
+              />
+              <Field
+                label={t("loanDetail", "cashDisbursed")}
+                value={formatPaise(loan.principal_paise - (loan.first_month_interest_paise ?? 0))}
+                mono
+                highlight
+              />
+            </div>
           </div>
         )}
 
@@ -268,6 +283,7 @@ export function LoanDetail({
       {isActive && (
         <CloseLoanPanel
           loanId={loan.id}
+          loanDate={loan.loan_date}
           principalPaise={loan.principal_paise}
           segments={loan.interest_rate_segments}
           paidInterestPaise={loan.payments
@@ -275,6 +291,7 @@ export function LoanDetail({
             .reduce((s, p) => s + p.amount_paise, 0)}
           initialMode={mode}
           firstMonthDeducted={loan.first_month_interest_deducted ?? false}
+          firstMonthInterestPaise={loan.first_month_interest_paise ?? 0}
           blockedByRePledge={activeRePledge != null}
           supabase={supabase}
           onClosed={() => router.refresh()}
@@ -420,6 +437,17 @@ function PaymentsSection({
 }) {
   const { t } = useLocale();
   const isActive = loan.status === "active";
+
+  // The first month's interest deducted at issuance is stored as an `interest`
+  // payment dated the loan date. Surface it as a disbursement deduction rather
+  // than a normal customer payment, so payment history shows only real payments.
+  const issuanceDeduction = loan.first_month_interest_deducted
+    ? loan.payments.find((p) => p.payment_type === "interest" && p.payment_date === loan.loan_date)
+    : undefined;
+  const customerPayments = issuanceDeduction
+    ? loan.payments.filter((p) => p.id !== issuanceDeduction.id)
+    : loan.payments;
+
   const [showForm, setShowForm] = useState(false);
   const [paymentType, setPaymentType] = useState<Payment["payment_type"]>("interest");
   const [paymentDate, setPaymentDate] = useState(toDateInputValue(new Date()));
@@ -472,9 +500,18 @@ function PaymentsSection({
         )}
       </div>
 
+      {issuanceDeduction && (
+        <div className="mb-3 flex justify-between border-b border-gold-soft pb-3 font-mono text-sm text-ink-soft">
+          <span>
+            {issuanceDeduction.payment_date} — {t("loanDetail", "interestDeductedAtIssue")}
+          </span>
+          <span className="font-semibold">− {formatPaise(issuanceDeduction.amount_paise)}</span>
+        </div>
+      )}
+
       <ul className="flex flex-col gap-2">
-        {loan.payments.length === 0 && <li className="text-ink-soft">{t("loanDetail", "noPayments")}</li>}
-        {loan.payments.map((p) => (
+        {customerPayments.length === 0 && <li className="text-ink-soft">{t("loanDetail", "noPayments")}</li>}
+        {customerPayments.map((p) => (
           <li key={p.id} className="flex justify-between font-mono text-sm">
             <span>
               {p.payment_date} — {t("paymentType", p.payment_type)}
@@ -570,21 +607,25 @@ const parseUTC = (s: string) => new Date(s + "T00:00:00Z");
 
 function CloseLoanPanel({
   loanId,
+  loanDate,
   principalPaise,
   segments,
   paidInterestPaise,
   initialMode,
   firstMonthDeducted,
+  firstMonthInterestPaise,
   blockedByRePledge,
   supabase,
   onClosed,
 }: {
   loanId: string;
+  loanDate: string;
   principalPaise: number;
   segments: RateSegment[];
   paidInterestPaise: number;
   initialMode: InterestMode;
   firstMonthDeducted: boolean;
+  firstMonthInterestPaise: number;
   blockedByRePledge: boolean;
   supabase: ReturnType<typeof createClient>;
   onClosed: () => void;
@@ -598,25 +639,29 @@ function CloseLoanPanel({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const rateSegs = useMemo(() => toRateSegments(segments), [segments]);
   const openSeg = segments.find((s) => s.effective_to === null) ?? segments[segments.length - 1];
   const currentRate = openSeg?.rate_percent ?? 0;
 
   // Everything below recomputes live from the chosen closed date + interest mode.
+  // Total elapsed months are measured from the LOAN DATE (not the latest rate
+  // segment) so the figure the operator sees is the whole term of the loan.
   const asOf = parseUTC(closedDate);
-  const openStart = openSeg ? parseUTC(openSeg.effective_from) : asOf;
-  const autoMonths = monthsForPeriod(openStart, asOf, mode);
+  const loanStart = parseUTC(loanDate);
+  const autoMonths = asOf >= loanStart ? monthsForPeriod(loanStart, asOf, mode) : 0;
 
   const months = monthsOverride !== "" && !Number.isNaN(parseFloat(monthsOverride)) ? parseFloat(monthsOverride) : autoMonths;
 
-  // Interest from any already-closed (past) rate segments stays fixed; only the
-  // current open segment's months are adjustable.
-  const autoInterestAtClose = calculateInterestPaise(principalPaise, rateSegs, asOf, mode);
-  const openInterestAuto = interestForMonths(principalPaise, currentRate, autoMonths);
-  const pastInterest = Math.max(0, autoInterestAtClose - openInterestAuto);
-
-  const originalInterest = pastInterest + interestForMonths(principalPaise, currentRate, months);
-  // Interest already collected (incl. any first-month deducted at issuance) is credited.
+  // Settlement is driven entirely by the displayed months so the four figures
+  // (elapsed months, calc months, balance interest, final settlement) always
+  // agree: interest = months × monthly interest, at the current rate. If the
+  // rate changed mid-term, adjust the months or final amount fields as needed.
+  const monthlyInterest = interestForMonths(principalPaise, currentRate, 1);
+  const originalInterest = interestForMonths(principalPaise, currentRate, months);
+  // Credits: the first month deducted at issuance plus any interest paid since.
+  // Both are recorded as `interest` payments, so paidInterestPaise already sums
+  // them; split it out only for display.
+  const firstMonthCredit = firstMonthDeducted ? firstMonthInterestPaise : 0;
+  const otherInterestPaid = Math.max(0, paidInterestPaise - firstMonthCredit);
   const balanceInterest = Math.max(0, originalInterest - paidInterestPaise);
   const settlementPaise = principalPaise + balanceInterest;
   const finalAmount = finalEdited ?? (settlementPaise / 100).toFixed(2);
@@ -709,11 +754,17 @@ function CloseLoanPanel({
             </button>
           </div>
 
-          {/* Settlement breakdown (req 8) */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-gold-soft bg-ivory-deep/40 p-3 text-sm sm:grid-cols-3 lg:grid-cols-5">
-            <Field label={t("newLoan", "principal")} value={formatPaise(principalPaise)} mono />
+          {/* Settlement breakdown — every figure is derived from `months`, so the
+              displayed months, interest and settlement always agree (req 8). */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-gold-soft bg-ivory-deep/40 p-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
+            <Field label={t("loanDetail", "principalAmount")} value={formatPaise(principalPaise)} mono />
+            <Field label={t("loanDetail", "elapsedMonths")} value={`${months} ${t("loanDetail", "monthsUnit")}`} mono />
+            <Field label={t("loanDetail", "monthlyInterest")} value={formatPaise(monthlyInterest)} mono />
             <Field label={t("loanDetail", "originalInterest")} value={formatPaise(originalInterest)} mono />
-            <Field label={firstMonthDeducted ? t("loanDetail", "firstMonthDeductedLabel") : t("loanDetail", "paidInterest")} value={formatPaise(paidInterestPaise)} mono />
+            {firstMonthDeducted && (
+              <Field label={t("loanDetail", "firstMonthDeductedLabel")} value={`− ${formatPaise(firstMonthCredit)}`} mono />
+            )}
+            <Field label={t("loanDetail", "paidInterest")} value={`− ${formatPaise(otherInterestPaid)}`} mono />
             <Field label={t("loanDetail", "balanceInterest")} value={formatPaise(balanceInterest)} mono />
             <Field label={t("loanDetail", "finalSettlement")} value={formatPaise(settlementPaise)} mono highlight />
           </div>
